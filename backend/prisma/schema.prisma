@@ -1,0 +1,98 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id           String              @id @default(cuid())
+  email        String              @unique
+  passwordHash String?
+  googleId     String?             @unique
+  createdAt    DateTime            @default(now())
+  profile      Profile?
+  plans        Plan[]
+  logs         ProgressLog[]
+  resetTokens  PasswordResetToken[]
+  sessions     UserSession[]
+}
+
+model UserSession {
+  id               String   @id @default(cuid())
+  userId           String
+  refreshTokenHash String
+  deviceId         String?
+  deviceName       String?
+  platform         String?
+  appVersion       String?
+  ipAddress        String?
+  createdAt        DateTime @default(now())
+  lastUsedAt       DateTime @default(now())
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshTokenHash])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  codeHash  String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Profile {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  displayName        String?
+  avatarUrl          String?
+  goal               String
+  dietaryPreferences String[]
+  restrictions       String[]
+  localStaples       String[]
+  activityLevel      String?
+  experienceLevel    String?
+  daysPerWeek        Int      @default(3)
+  mealsPerDay        Int      @default(3)
+  equipment          String[]
+  heightCm           Float?
+  weightKg           Float?
+  age                Int?
+  sex                String?
+  updatedAt          DateTime @updatedAt
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Plan {
+  id            String   @id @default(cuid())
+  userId        String
+  type          String   @default("combined")
+  contentJson   Json
+  disclaimer    String
+  openaiModel   String?
+  promptVersion String   @default("v1")
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ProgressLog {
+  id            String   @id @default(cuid())
+  userId        String
+  date          DateTime @db.Date
+  workoutDone   Boolean  @default(false)
+  mealsFollowed Boolean  @default(false)
+  weightKg      Float?
+  notes         String?
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+}

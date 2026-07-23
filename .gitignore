@@ -1,0 +1,39 @@
+# Dependencies & build output
+**/node_modules/
+dist/
+**/dist/
+
+# Secrets — use .env.example only in the repo
+.env
+.env.local
+**/.env
+**/.env.*
+!**/.env.example
+
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Signing keys (never commit)
+*.jks
+*.keystore
+*.p12
+*.pem
+
+# React Native / Metro
+mobile/android/app/build/
+mobile/android/build/
+mobile/android/.gradle/
+mobile/ios/build/
+mobile/ios/Pods/
+mobile/.expo/
+
+# Backend local/runtime
+backend/uploads/
+backend/src/generated/
+
+# Prisma local SQLite (if used)
+backend/prisma/*.db
+backend/prisma/*.db-journal

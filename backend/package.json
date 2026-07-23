@@ -1,0 +1,52 @@
+{
+  "name": "b4-fitness-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "B4 AI Fitness & Nutrition Coach API",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "tsx --test src/**/*.test.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "db:check": "tsx scripts/check-db.ts",
+    "db:seed-user": "tsx scripts/seed-user.ts",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate dev",
+    "prisma:studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "bcrypt": "^6.0.0",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.0",
+    "google-auth-library": "^10.9.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "nodemailer": "^9.0.3",
+    "openai": "^6.48.0",
+    "pg": "^8.22.0",
+    "zod": "^4.4.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/multer": "^2.2.0",
+    "@types/node": "^26.1.1",
+    "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.20.0",
+    "prisma": "^7.8.0",
+    "tsx": "^4.23.1",
+    "typescript": "^5.9.3"
+  }
+}
