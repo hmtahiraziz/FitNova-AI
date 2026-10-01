@@ -55,6 +55,16 @@ After changing mobile env vars, restart Metro: `npm start -- --reset-cache`.
 
 See `backend/.env.example` and `mobile/.env.example` for all variables. Do not commit `.env` files; they are listed in `.gitignore`.
 
+## Deploy backend (Railway)
+
+1. Create a Railway project from this GitHub repo.
+2. Set the service **Root Directory** to `backend`.
+3. Railway will use `backend/Dockerfile` (preferred) or `backend/railway.toml` build/start settings.
+4. Add environment variables from `backend/.env.example` (`DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, Google/SMTP vars, `NODE_ENV=production`, etc.). Do **not** set `PORT` — Railway provides it.
+5. Generate a public domain, then set mobile `API_BASE_URL` to that HTTPS URL.
+
+Health check: `GET /health`
+
 ## Development
 
 ```bash

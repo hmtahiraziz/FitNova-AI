@@ -82,6 +82,48 @@ export function PlanScreen() {
     setRefreshing(false);
   };
 
+  const todayWorkoutIndex = useMemo(() => {
+    if (!latest) {
+      return 0;
+    }
+    const slice = resolveTodayFromPlan(latest);
+    return slice?.workoutIndex ?? 0;
+  }, [latest]);
+
+  const orderedWorkoutDays = useMemo(() => {
+    if (!latest) {
+      return [];
+    }
+    const days = latest.content.workoutPlan.days;
+    if (days.length === 0) {
+      return [];
+    }
+    const items: Array<{
+      day: (typeof days)[number];
+      planIndex: number;
+      displayDayNumber: number;
+    }> = [];
+    for (let i = 0; i < days.length; i++) {
+      const planIndex = (todayWorkoutIndex + i) % days.length;
+      items.push({
+        day: days[planIndex],
+        planIndex,
+        displayDayNumber: i + 1,
+      });
+    }
+    return items;
+  }, [latest, todayWorkoutIndex]);
+
+  const totalExercises = useMemo(() => {
+    if (!latest) {
+      return 0;
+    }
+    return latest.content.workoutPlan.days.reduce(
+      (n, d) => n + d.exercises.length,
+      0,
+    );
+  }, [latest]);
+
   if (!latest) {
     return (
       <Screen>
@@ -101,33 +143,6 @@ export function PlanScreen() {
   }
 
   const { content, disclaimer } = latest;
-
-  const todayWorkoutIndex = useMemo(() => {
-    const slice = resolveTodayFromPlan(latest);
-    return slice?.workoutIndex ?? 0;
-  }, [latest]);
-
-  const orderedWorkoutDays = useMemo(() => {
-    const days = content.workoutPlan.days;
-    if (days.length === 0) {
-      return [];
-    }
-    const items: Array<{ day: (typeof days)[number]; planIndex: number; displayDayNumber: number }> = [];
-    for (let i = 0; i < days.length; i++) {
-      const planIndex = (todayWorkoutIndex + i) % days.length;
-      items.push({
-        day: days[planIndex],
-        planIndex,
-        displayDayNumber: i + 1,
-      });
-    }
-    return items;
-  }, [content.workoutPlan.days, todayWorkoutIndex]);
-
-  const totalExercises = useMemo(
-    () => content.workoutPlan.days.reduce((n, d) => n + d.exercises.length, 0),
-    [content.workoutPlan.days],
-  );
 
   const todayFocus =
     content.workoutPlan.days[todayWorkoutIndex]?.focus ?? '—';
