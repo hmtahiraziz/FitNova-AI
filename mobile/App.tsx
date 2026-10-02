@@ -40,7 +40,6 @@ function waitForPersistHydration(timeoutMs = 2000): Promise<void> {
         unsub();
         resolve();
       });
-      // Race: hydration may complete between hasHydrated() and subscribe.
       if (useAuthStore.persist.hasHydrated()) {
         unsub();
         resolve();
@@ -54,11 +53,18 @@ function waitForPersistHydration(timeoutMs = 2000): Promise<void> {
 
 function App() {
   useEffect(() => {
-    configureGoogleSignIn();
+    // Unlock navigation immediately — never wait on Keychain / Google / API.
+    useAuthStore.getState().setHydrated(true);
+
+    try {
+      configureGoogleSignIn();
+    } catch {
+      // Google optional at boot; sign-in screens handle missing config.
+    }
+
     const boot = async () => {
       try {
         await waitForPersistHydration();
-        // Keychain / refresh can hang on some devices — never block first paint.
         await Promise.race([
           useAuthStore.getState().bootstrap(),
           new Promise<void>((resolve) => {
@@ -66,9 +72,7 @@ function App() {
           }),
         ]);
       } catch {
-        // Network / refresh failures are handled inside bootstrap; never block UI.
-      } finally {
-        useAuthStore.getState().setHydrated(true);
+        // Session restore is best-effort; Welcome/Login remain usable.
       }
     };
     void boot();
