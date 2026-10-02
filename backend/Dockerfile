@@ -1,3 +1,4 @@
+# FitNova API — multi-stage production image for Railway / Docker
 FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
@@ -15,8 +16,14 @@ RUN npm ci
 COPY tsconfig.json ./
 COPY src ./src
 
+# prisma.config.ts requires DATABASE_URL when it loads. Build-time generate does not
+# connect to a database; a placeholder is enough. Railway injects the real URL at runtime.
+ARG DATABASE_URL="postgresql://prisma:prisma@127.0.0.1:5432/prisma?sslmode=disable"
+ENV DATABASE_URL=${DATABASE_URL}
+
 RUN npx prisma generate && npm run build
 
+# -----------------------------------------------------------------------------
 FROM node:22-bookworm-slim
 
 WORKDIR /app
@@ -26,6 +33,11 @@ RUN apt-get update -y \
   && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
+
+# Same placeholder for any Prisma CLI that loads prisma.config.ts during image build.
+# At runtime Railway's DATABASE_URL variable overrides this.
+ARG DATABASE_URL="postgresql://prisma:prisma@127.0.0.1:5432/prisma?sslmode=disable"
+ENV DATABASE_URL=${DATABASE_URL}
 
 COPY package.json package-lock.json ./
 COPY prisma ./prisma/
@@ -38,4 +50,5 @@ COPY --from=builder /app/src/generated ./src/generated
 
 EXPOSE 4000
 
+# Real DATABASE_URL must be set in the host environment (Railway Variables).
 CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]
