@@ -5,10 +5,10 @@
   "description": "FitNova AI fitness & nutrition coach API",
   "main": "dist/index.js",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "node api.js && tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js",
-    "start:prod": "prisma migrate deploy && node dist/index.js",
+    "start": "node api.js && node dist/index.js",
+    "start:prod": "node api.js && prisma migrate deploy && node dist/index.js",
     "test": "tsx --test src/**/*.test.ts",
     "smoke": "tsx scripts/smoke.ts",
     "db:check": "tsx scripts/check-db.ts",
