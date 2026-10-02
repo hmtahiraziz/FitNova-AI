@@ -12,6 +12,7 @@ import { PlanDetailScreen } from '../screens/plan/PlanDetailScreen';
 import { WorkoutSessionScreen } from '../screens/plan/WorkoutSessionScreen';
 import { PlanHistoryScreen } from '../screens/plan/PlanHistoryScreen';
 import { AdvancedSettingsScreen } from '../screens/profile/AdvancedSettingsScreen';
+import { LegalDocumentScreen } from '../screens/legal/LegalDocumentScreen';
 import { SwipeableAppShell } from './SwipeableAppShell';
 import { useAuthStore } from '../store/authStore';
 import { usePlanStore } from '../store/planStore';
@@ -34,6 +35,11 @@ function AuthNavigator() {
         component={ForgotPasswordScreen}
       />
       <AuthStack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <AuthStack.Screen
+        name="LegalDocument"
+        component={LegalDocumentScreen}
+        options={{ animation: 'slide_from_right' }}
+      />
     </AuthStack.Navigator>
   );
 }
@@ -90,7 +96,14 @@ export function RootNavigator() {
       {!token ? (
         <RootStack.Screen name="Auth" component={AuthNavigator} />
       ) : !profileComplete ? (
-        <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+        <>
+          <RootStack.Screen name="Onboarding" component={OnboardingScreen} />
+          <RootStack.Screen
+            name="LegalDocument"
+            component={LegalDocumentScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+        </>
       ) : (
         <>
           <RootStack.Screen name="App" component={SwipeableAppShell} />
@@ -117,6 +130,11 @@ export function RootNavigator() {
           <RootStack.Screen
             name="AdvancedSettings"
             component={AdvancedSettingsScreen}
+            options={{ animation: 'slide_from_right' }}
+          />
+          <RootStack.Screen
+            name="LegalDocument"
+            component={LegalDocumentScreen}
             options={{ animation: 'slide_from_right' }}
           />
         </>

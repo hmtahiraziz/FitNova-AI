@@ -304,10 +304,38 @@ export function AdvancedSettingsScreen({ navigation }: Props) {
           </Text>
           <SettingRow
             label="Usage analytics"
-            description="Help improve FitNova AI (device-only preferences for now)."
+            description="Optional preference stored on this device only. No analytics SDK is active yet."
             value={analyticsEnabled}
             onValueChange={setAnalyticsEnabled}
           />
+          <GlassSurface className="mb-3 px-4 py-4">
+            <Text className="font-sans-semibold text-base text-ink">
+              Legal
+            </Text>
+            <Text className="mt-1 font-sans text-sm leading-5 text-slate">
+              How {brand.fullName} handles your account, health profile, and photos.
+            </Text>
+            <Pressable
+              accessibilityRole="link"
+              onPress={() =>
+                navigation.navigate('LegalDocument', { doc: 'privacy' })
+              }
+              className="mt-3">
+              <Text className="font-sans-semibold text-sm text-mint">
+                Privacy Policy →
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="link"
+              onPress={() =>
+                navigation.navigate('LegalDocument', { doc: 'terms' })
+              }
+              className="mt-2">
+              <Text className="font-sans-semibold text-sm text-mint">
+                Terms of Service →
+              </Text>
+            </Pressable>
+          </GlassSurface>
 
           <GlassSurface className="mt-2 px-4 py-4">
             <Text className="font-sans-semibold text-base text-ink">

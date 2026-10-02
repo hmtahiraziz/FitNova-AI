@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { env } from '../config/env';
+import { APP_NAME } from '../content/legal';
 import { AppError } from '../middleware/errorHandler';
 
 function smtpConfigured(): boolean {
@@ -30,11 +31,11 @@ export async function sendPasswordResetEmail(
   await transporter.sendMail({
     from: env.SMTP_FROM,
     to,
-    subject: 'B4 password reset code',
-    text: `Your B4 reset code is ${code}. It expires in 15 minutes.`,
+    subject: `${APP_NAME} password reset code`,
+    text: `Your ${APP_NAME} reset code is ${code}. It expires in 15 minutes.`,
     html: `
       <div style="font-family: sans-serif; color: #0B1F1A;">
-        <h2>Reset your B4 password</h2>
+        <h2>Reset your ${APP_NAME} password</h2>
         <p>Use this code in the app:</p>
         <p style="font-size: 28px; letter-spacing: 4px; font-weight: 700;">${code}</p>
         <p style="color: #4A5C56;">Expires in 15 minutes. If you did not request this, ignore this email.</p>

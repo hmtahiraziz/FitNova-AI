@@ -1,11 +1,11 @@
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
-import path from 'path';
-import { env } from './config/env';
+import { env, uploadsRoot } from './config/env';
 import { errorHandler } from './middleware/errorHandler';
 import { authRouter } from './routes/auth.routes';
 import { healthRouter } from './routes/health.routes';
+import { legalRouter } from './routes/legal.routes';
 import { plansRouter } from './routes/plans.routes';
 import { profileRouter } from './routes/profile.routes';
 import { progressRouter } from './routes/progress.routes';
@@ -18,6 +18,7 @@ export function createApp() {
   app.use(
     helmet({
       crossOriginResourcePolicy: { policy: 'cross-origin' },
+      contentSecurityPolicy: false,
     }),
   );
   app.use(
@@ -29,12 +30,13 @@ export function createApp() {
 
   app.use(
     '/uploads',
-    express.static(path.join(process.cwd(), 'uploads'), {
+    express.static(uploadsRoot(), {
       maxAge: env.NODE_ENV === 'production' ? '7d' : 0,
     }),
   );
 
   app.use('/health', healthRouter);
+  app.use('/legal', legalRouter);
   app.use('/auth', authRouter);
   app.use('/profile', profileRouter);
   app.use('/plans', plansRouter);

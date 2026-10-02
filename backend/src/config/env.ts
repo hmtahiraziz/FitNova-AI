@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import dotenv from 'dotenv';
+import path from 'path';
 
 dotenv.config();
 
@@ -19,8 +20,14 @@ const envSchema = z.object({
   SMTP_PORT: z.coerce.number().int().positive().default(587),
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASS: z.string().optional().default(''),
-  SMTP_FROM: z.string().optional().default('B4 Fitness <noreply@b4.fitness>'),
+  SMTP_FROM: z
+    .string()
+    .optional()
+    .default('FitNova AI <noreply@example.com>'),
   APP_URL: z.string().optional().default('http://localhost:4000'),
+  /** Absolute path for uploads (mount a Railway volume here in production). */
+  UPLOADS_DIR: z.string().optional().default(''),
+  SUPPORT_EMAIL: z.string().optional().default('support@example.com'),
 });
 
 const parsed = envSchema.safeParse(process.env);
@@ -34,6 +41,25 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
+if (env.NODE_ENV === 'production' && env.CORS_ORIGIN === '*') {
+  console.warn(
+    '[fitnova] CORS_ORIGIN is "*" in production. Prefer locking to known origins if you add a web client.',
+  );
+}
+
+if (env.NODE_ENV === 'production' && !env.UPLOADS_DIR) {
+  console.warn(
+    '[fitnova] UPLOADS_DIR is unset. Profile photos will be lost on redeploy unless you mount a Railway volume.',
+  );
+}
+
 export function googleAudiences(): string[] {
   return [env.GOOGLE_WEB_CLIENT_ID, env.GOOGLE_CLIENT_ID].filter(Boolean);
+}
+
+export function uploadsRoot(): string {
+  if (env.UPLOADS_DIR.trim()) {
+    return path.resolve(env.UPLOADS_DIR.trim());
+  }
+  return path.join(process.cwd(), 'uploads');
 }

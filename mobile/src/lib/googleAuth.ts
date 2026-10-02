@@ -15,6 +15,11 @@ export function configureGoogleSignIn() {
 }
 
 export async function getGoogleIdToken(): Promise<string> {
+  if (!GOOGLE_WEB_CLIENT_ID) {
+    throw new Error(
+      'Google Sign-In is not configured. Set GOOGLE_WEB_CLIENT_ID in mobile/.env.',
+    );
+  }
   configureGoogleSignIn();
   await GoogleSignin.hasPlayServices({ showPlayServicesUpdateDialog: true });
   const result = await GoogleSignin.signIn();

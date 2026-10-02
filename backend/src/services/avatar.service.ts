@@ -1,9 +1,13 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { uploadsRoot } from '../config/env';
 import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 
-const AVATAR_DIR = path.join(process.cwd(), 'uploads', 'avatars');
+function avatarDir(): string {
+  return path.join(uploadsRoot(), 'avatars');
+}
+
 const ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_BYTES = 5 * 1024 * 1024;
 
@@ -18,8 +22,9 @@ function extensionForMime(mime: string): 'jpg' | 'png' | 'webp' {
 }
 
 async function removeAvatarFiles(userId: string) {
+  const dir = avatarDir();
   for (const ext of ['jpg', 'png', 'webp'] as const) {
-    const filePath = path.join(AVATAR_DIR, `${userId}.${ext}`);
+    const filePath = path.join(dir, `${userId}.${ext}`);
     try {
       await fs.unlink(filePath);
     } catch {
@@ -47,15 +52,16 @@ export async function setProfileAvatar(
     throw new AppError('Complete your profile before adding a photo', 400);
   }
 
-  await fs.mkdir(AVATAR_DIR, { recursive: true });
+  const dir = avatarDir();
+  await fs.mkdir(dir, { recursive: true });
   await removeAvatarFiles(userId);
 
   const ext = extensionForMime(file.mimetype);
   const filename = `${userId}.${ext}`;
-  await fs.writeFile(path.join(AVATAR_DIR, filename), file.buffer);
+  await fs.writeFile(path.join(dir, filename), file.buffer);
 
   const avatarUrl = `/uploads/avatars/${filename}`;
-  const profile = await prisma.profile.update({
+  await prisma.profile.update({
     where: { userId },
     data: { avatarUrl },
   });
@@ -80,5 +86,5 @@ export async function clearProfileAvatar(userId: string) {
 }
 
 export async function ensureUploadDirs() {
-  await fs.mkdir(AVATAR_DIR, { recursive: true });
+  await fs.mkdir(avatarDir(), { recursive: true });
 }

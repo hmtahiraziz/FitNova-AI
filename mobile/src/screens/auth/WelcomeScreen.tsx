@@ -82,6 +82,25 @@ export function WelcomeScreen({ navigation }: Props) {
             {googleError}
           </Text>
         ) : null}
+        <Text className="mt-4 text-center font-sans text-xs leading-5 text-slate">
+          By continuing you agree to our{' '}
+          <Text
+            className="font-sans-semibold text-ink"
+            onPress={() =>
+              navigation.navigate('LegalDocument', { doc: 'terms' })
+            }>
+            Terms
+          </Text>
+          {' '}and{' '}
+          <Text
+            className="font-sans-semibold text-ink"
+            onPress={() =>
+              navigation.navigate('LegalDocument', { doc: 'privacy' })
+            }>
+            Privacy Policy
+          </Text>
+          .
+        </Text>
       </View>
     </Screen>
   );

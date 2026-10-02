@@ -4,6 +4,7 @@ export type AuthStackParamList = {
   Register: undefined;
   ForgotPassword: { email?: string } | undefined;
   ResetPassword: { email: string; devCode?: string; resendLockedUntil?: number };
+  LegalDocument: { doc: 'privacy' | 'terms' };
 };
 
 export type AppTabParamList = {
@@ -23,4 +24,5 @@ export type RootStackParamList = {
   PlanDetail: { planId: string };
   WorkoutSession: { dayIndex: number; planId?: string };
   AdvancedSettings: undefined;
+  LegalDocument: { doc: 'privacy' | 'terms' };
 };

@@ -173,6 +173,26 @@ export function RegisterScreen({ navigation }: Props) {
             <Text className="mb-3 font-sans text-sm text-coral">{formError}</Text>
           ) : null}
 
+          <Text className="mb-4 font-sans text-xs leading-5 text-slate">
+            By creating an account you agree to our{' '}
+            <Text
+              className="font-sans-semibold text-ink"
+              onPress={() =>
+                navigation.navigate('LegalDocument', { doc: 'terms' })
+              }>
+              Terms of Service
+            </Text>
+            {' '}and{' '}
+            <Text
+              className="font-sans-semibold text-ink"
+              onPress={() =>
+                navigation.navigate('LegalDocument', { doc: 'privacy' })
+              }>
+              Privacy Policy
+            </Text>
+            .
+          </Text>
+
           <PrimaryButton
             label={isSubmitting ? 'Creating…' : 'Create account'}
             onPress={onSubmit}

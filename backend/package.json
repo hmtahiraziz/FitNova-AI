@@ -1,8 +1,8 @@
 {
-  "name": "b4-fitness-backend",
+  "name": "fitnova-api",
   "version": "1.0.0",
   "private": true,
-  "description": "B4 AI Fitness & Nutrition Coach API",
+  "description": "FitNova AI fitness & nutrition coach API",
   "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
