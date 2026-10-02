@@ -28,20 +28,42 @@ function AppContent() {
   );
 }
 
+/** Avoid hanging forever if persist hydration already finished (or never fires). */
+function waitForPersistHydration(timeoutMs = 2000): Promise<void> {
+  if (useAuthStore.persist.hasHydrated()) {
+    return Promise.resolve();
+  }
+
+  return Promise.race([
+    new Promise<void>((resolve) => {
+      const unsub = useAuthStore.persist.onFinishHydration(() => {
+        unsub();
+        resolve();
+      });
+      // Race: hydration may complete between hasHydrated() and subscribe.
+      if (useAuthStore.persist.hasHydrated()) {
+        unsub();
+        resolve();
+      }
+    }),
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, timeoutMs);
+    }),
+  ]);
+}
+
 function App() {
   useEffect(() => {
     configureGoogleSignIn();
     const boot = async () => {
-      if (!useAuthStore.persist.hasHydrated()) {
-        await new Promise<void>((resolve) => {
-          const unsub = useAuthStore.persist.onFinishHydration(() => {
-            unsub();
-            resolve();
-          });
-        });
+      try {
+        await waitForPersistHydration();
+        await useAuthStore.getState().bootstrap();
+      } catch {
+        // Network / refresh failures are handled inside bootstrap; never block UI.
+      } finally {
+        useAuthStore.getState().setHydrated(true);
       }
-      await useAuthStore.getState().bootstrap();
-      useAuthStore.getState().setHydrated(true);
     };
     void boot();
   }, []);
