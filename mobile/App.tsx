@@ -58,7 +58,13 @@ function App() {
     const boot = async () => {
       try {
         await waitForPersistHydration();
-        await useAuthStore.getState().bootstrap();
+        // Keychain / refresh can hang on some devices — never block first paint.
+        await Promise.race([
+          useAuthStore.getState().bootstrap(),
+          new Promise<void>((resolve) => {
+            setTimeout(resolve, 5000);
+          }),
+        ]);
       } catch {
         // Network / refresh failures are handled inside bootstrap; never block UI.
       } finally {
