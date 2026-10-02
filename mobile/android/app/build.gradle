@@ -92,6 +92,11 @@ android {
             manifestPlaceholders = [usesCleartextTraffic: "false"]
         }
     }
+    applicationVariants.configureEach { variant ->
+        variant.outputs.configureEach { output ->
+            outputFileName = "FitNova-${variant.versionName}-${variant.buildType.name}.apk"
+        }
+    }
 }
 
 dependencies {
