@@ -1,8 +1,11 @@
 import cors from 'cors';
 import express from 'express';
 import helmet from 'helmet';
-import { env, uploadsRoot } from './config/env';
+import swaggerUi from 'swagger-ui-express';
+import { env } from './config/env';
+import { buildOpenApiDocument } from './docs/openapi';
 import { errorHandler } from './middleware/errorHandler';
+import { swaggerBasicAuth } from './middleware/swaggerBasicAuth';
 import { authRouter } from './routes/auth.routes';
 import { healthRouter } from './routes/health.routes';
 import { legalRouter } from './routes/legal.routes';
@@ -28,12 +31,20 @@ export function createApp() {
   );
   app.use(express.json({ limit: '1mb' }));
 
-  app.use(
-    '/uploads',
-    express.static(uploadsRoot(), {
-      maxAge: env.NODE_ENV === 'production' ? '7d' : 0,
-    }),
-  );
+  // Profile photos are served only via authenticated GET /profile/avatar (not public static).
+
+  if (env.NODE_ENV !== 'production') {
+    const openApiDoc = buildOpenApiDocument();
+    app.get('/openapi.json', swaggerBasicAuth, (_req, res) => {
+      res.json(openApiDoc);
+    });
+    app.use(
+      '/docs',
+      swaggerBasicAuth,
+      swaggerUi.serve,
+      swaggerUi.setup(openApiDoc),
+    );
+  }
 
   app.use('/health', healthRouter);
   app.use('/legal', legalRouter);

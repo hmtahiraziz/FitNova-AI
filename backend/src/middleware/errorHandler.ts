@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { ZodError } from 'zod';
+import { env } from '../config/env';
 
 export class AppError extends Error {
   statusCode: number;
@@ -14,6 +15,42 @@ export class AppError extends Error {
   }
 }
 
+const SAFE_DETAIL_KEYS = new Set([
+  'retryAfterSeconds',
+  'generationsUsedLastHour',
+  'generationsLimitPerHour',
+  'code',
+]);
+
+/** Only expose structured, non-sensitive details to clients. */
+export function publicErrorDetails(details: unknown): unknown {
+  if (details == null) {
+    return undefined;
+  }
+  if (typeof details !== 'object' || details instanceof Error) {
+    return undefined;
+  }
+  if (Array.isArray(details)) {
+    return undefined;
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(
+    details as Record<string, unknown>,
+  )) {
+    if (!SAFE_DETAIL_KEYS.has(key)) {
+      continue;
+    }
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      out[key] = value;
+    }
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 export function errorHandler(
   err: unknown,
   _req: Request,
@@ -21,18 +58,26 @@ export function errorHandler(
   _next: NextFunction,
 ): void {
   if (err instanceof AppError) {
-    res.status(err.statusCode).json({
+    const payload: { error: string; details?: unknown } = {
       error: err.message,
-      details: err.details,
-    });
+    };
+    const details = publicErrorDetails(err.details);
+    if (details !== undefined) {
+      payload.details = details;
+    }
+    res.status(err.statusCode).json(payload);
     return;
   }
 
   if (err instanceof ZodError) {
-    res.status(400).json({
-      error: 'Validation failed',
-      details: err.flatten(),
-    });
+    if (env.NODE_ENV === 'production') {
+      res.status(400).json({ error: 'Validation failed' });
+    } else {
+      res.status(400).json({
+        error: 'Validation failed',
+        details: err.flatten(),
+      });
+    }
     return;
   }
 

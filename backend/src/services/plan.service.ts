@@ -21,13 +21,23 @@ import { sanitizePlanContent } from '../utils/planSanitizer';
 import {
   normalizeShoppingHints,
   validatePlanAgainstProfile,
+  validatePlanRestrictions,
 } from '../utils/planContentValidation';
 import {
   getGenerationQuota,
   PLAN_GENERATIONS_PER_HOUR,
 } from '../utils/planGenerationLimits';
+import {
+  applyPlanSafety,
+  assertSafeToGeneratePlan,
+  detectDisorderedEatingSignals,
+  isProtectedProfile,
+} from '../utils/planSafety';
+import { evaluatePlanFreshness } from '../utils/planFreshness';
+import type { PlanReportBody } from '../schemas/plans.generate.schemas';
 
 const MAX_GENERATION_ATTEMPTS = 3;
+const OPENAI_MAX_TOKENS = 4096;
 
 const MEAL_NAME_PRESETS = [
   ['Breakfast', 'Lunch', 'Dinner'],
@@ -100,8 +110,8 @@ function buildFallbackPlan(
     ],
   }));
 
-  const calorieBase = focus === 'lighter_meals' ? 320 : 400;
-  const calorieMain = focus === 'lighter_meals' ? 480 : 550;
+  const calorieBase = focus === 'lighter_meals' ? 350 : 400;
+  const calorieMain = focus === 'lighter_meals' ? 500 : 550;
 
   const mealItemFor = (mi: number) => {
     if (focus === 'meal_variety') {
@@ -188,7 +198,13 @@ function finalizePlanContent(
   if (issue) {
     throw new Error(issue);
   }
-  return normalizeShoppingHints(sanitized, profile);
+  if (detectDisorderedEatingSignals(profile, sanitized)) {
+    throw new Error(
+      'SUPPORTIVE_REFUSAL: Plan content suggested unsafe restriction language.',
+    );
+  }
+  const safe = applyPlanSafety(sanitized, profile);
+  return normalizeShoppingHints(safe, profile);
 }
 
 function parseModelPlan(raw: string, profile: Profile): PlanContent {
@@ -200,6 +216,14 @@ function parseModelPlan(raw: string, profile: Profile): PlanContent {
   }
   const sanitized = sanitizePlanContent(parsed);
   planContentSchema.parse(sanitized);
+  const scheduleIssue = validatePlanAgainstProfile(sanitized, profile);
+  if (scheduleIssue) {
+    throw new Error(scheduleIssue);
+  }
+  const restrictionIssue = validatePlanRestrictions(sanitized, profile);
+  if (restrictionIssue) {
+    throw new Error(restrictionIssue);
+  }
   return finalizePlanContent(sanitized, profile);
 }
 
@@ -231,6 +255,7 @@ async function generateContentFromOpenAI(
       const completion = await openai.chat.completions.create({
         model,
         response_format: { type: 'json_object' },
+        max_tokens: OPENAI_MAX_TOKENS,
         messages: [
           { role: 'system', content: buildPlanSystemPrompt() },
           {
@@ -250,19 +275,45 @@ async function generateContentFromOpenAI(
       }
 
       const content = parseModelPlan(raw, profile);
+
+      // Reject near-duplicates on regenerate so retries ask for more variety.
+      if (ctx.isRegenerate && ctx.previousContent) {
+        const freshness = evaluatePlanFreshness(
+          ctx.previousContent,
+          content,
+          ctx.focus,
+        );
+        if (!freshness.ok) {
+          throw new Error(
+            freshness.message ??
+              'Plan must differ more from the previous plan',
+          );
+        }
+      }
+
       return { content, model };
     } catch (err) {
       lastError = err;
-      if (err instanceof Error && err.message.includes('must')) {
+      if (
+        err instanceof Error &&
+        (err.message.includes('must') ||
+          err.message.includes('conflicts') ||
+          err.message.includes('restriction') ||
+          err.message.includes('too similar') ||
+          err.message.includes('reuse') ||
+          err.message.includes('Avoid'))
+      ) {
         validationFix = err.message;
       }
     }
   }
 
+  if (lastError instanceof Error && lastError.message.startsWith('SUPPORTIVE_REFUSAL:')) {
+    throw new AppError(lastError.message.replace(/^SUPPORTIVE_REFUSAL:\s*/, ''), 422);
+  }
   throw new AppError(
     'Could not generate a valid plan. Please try again in a moment.',
     502,
-    lastError,
   );
 }
 
@@ -321,13 +372,60 @@ export type PlanGenerateMeta = {
   generateFocus: PlanGenerateFocus;
 };
 
+async function assertAiConsent(
+  userId: string,
+  acceptAiProcessing: boolean | undefined,
+) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { aiConsentAt: true },
+  });
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+  if (user.aiConsentAt) {
+    return;
+  }
+  if (acceptAiProcessing !== true) {
+    throw new AppError(
+      'Consent is required before generating plans with AI. Confirm that profile details may be sent to our AI provider.',
+      403,
+      { code: 'AI_CONSENT_REQUIRED' },
+    );
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { aiConsentAt: new Date() },
+  });
+}
+
 export async function generatePlan(
   userId: string,
   input: PlanGenerateBody = { intent: 'initial', focus: 'balanced' },
 ) {
   await assertRateLimit(userId);
   assertPlanGenerationAvailable();
+  await assertAiConsent(userId, input.acceptAiProcessing);
   const profile = await requireCompleteProfile(userId);
+
+  try {
+    assertSafeToGeneratePlan(profile);
+  } catch (err) {
+    if (err instanceof Error && err.message.startsWith('SUPPORTIVE_REFUSAL:')) {
+      throw new AppError(
+        err.message.replace(/^SUPPORTIVE_REFUSAL:\s*/, ''),
+        422,
+        { code: 'SUPPORTIVE_REFUSAL' },
+      );
+    }
+    throw err;
+  }
+
+  // Under-18 / underweight: never use "lighter_meals" focus as a deficit lever.
+  const focus =
+    isProtectedProfile(profile) && input.focus === 'lighter_meals'
+      ? 'balanced'
+      : input.focus;
 
   const previous = await prisma.plan.findFirst({
     where: { userId },
@@ -345,7 +443,7 @@ export async function generatePlan(
   if (hasOpenAI()) {
     const generated = await generateContentFromOpenAI(profile, {
       previousContent,
-      focus: input.focus,
+      focus,
       isRegenerate,
     });
     content = generated.content;
@@ -357,7 +455,7 @@ export async function generatePlan(
       );
     }
     content = finalizePlanContent(
-      sanitizePlanContent(buildFallbackPlan(profile, input.focus)),
+      sanitizePlanContent(buildFallbackPlan(profile, focus)),
       profile,
     );
     model = 'fallback-local';
@@ -384,8 +482,36 @@ export async function generatePlan(
       generationsRemainingThisHour: quota.generationsRemainingThisHour,
       previousPlanId: previous?.id ?? null,
       profileUpdatedAt: profile.updatedAt.toISOString(),
-      generateFocus: input.focus,
+      generateFocus: focus,
     } satisfies PlanGenerateMeta,
+  };
+}
+
+export async function reportPlan(
+  userId: string,
+  planId: string,
+  input: PlanReportBody,
+) {
+  const plan = await prisma.plan.findFirst({
+    where: { id: planId, userId },
+    select: { id: true },
+  });
+  if (!plan) {
+    throw new AppError('Plan not found', 404);
+  }
+
+  await prisma.planReport.create({
+    data: {
+      userId,
+      planId,
+      reason: input.reason,
+      details: input.details ?? null,
+    },
+  });
+
+  return {
+    message:
+      'Thanks for the report. We will review this plan. If you feel unsafe, contact a clinician or local emergency services.',
   };
 }
 

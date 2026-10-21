@@ -6,6 +6,13 @@ import {
   type SessionClientInfo,
 } from '../utils/refreshToken';
 
+/** Sliding refresh lifetime: each successful refresh extends by this duration. */
+export const REFRESH_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function refreshExpiresAt(from = new Date()): Date {
+  return new Date(from.getTime() + REFRESH_TTL_MS);
+}
+
 export async function createUserSession(
   userId: string,
   client: SessionClientInfo = {},
@@ -17,6 +24,8 @@ export async function createUserSession(
     data: {
       userId,
       refreshTokenHash,
+      previousRefreshTokenHash: null,
+      expiresAt: refreshExpiresAt(),
       deviceId: client.deviceId ?? null,
       deviceName: client.deviceName ?? null,
       platform: client.platform ?? null,
@@ -41,26 +50,45 @@ export async function rotateUserSessionRefreshToken(
     where: { refreshTokenHash },
   });
 
-  if (!session) {
-    throw new AppError('Invalid or expired session', 401);
+  if (session) {
+    if (session.expiresAt.getTime() <= Date.now()) {
+      await prisma.userSession.deleteMany({ where: { id: session.id } });
+      throw new AppError('Invalid or expired session', 401);
+    }
+
+    const newRefreshToken = generateRefreshToken();
+    const newHash = hashRefreshToken(newRefreshToken);
+
+    await prisma.userSession.update({
+      where: { id: session.id },
+      data: {
+        previousRefreshTokenHash: session.refreshTokenHash,
+        refreshTokenHash: newHash,
+        lastUsedAt: new Date(),
+        expiresAt: refreshExpiresAt(),
+      },
+    });
+
+    return {
+      sessionId: session.id,
+      userId: session.userId,
+      newRefreshToken,
+    };
   }
 
-  const newRefreshToken = generateRefreshToken();
-  const newHash = hashRefreshToken(newRefreshToken);
-
-  await prisma.userSession.update({
-    where: { id: session.id },
-    data: {
-      refreshTokenHash: newHash,
-      lastUsedAt: new Date(),
-    },
+  // Reuse detection: presented token matches a rotated-away hash.
+  const reused = await prisma.userSession.findFirst({
+    where: { previousRefreshTokenHash: refreshTokenHash },
   });
+  if (reused) {
+    await revokeAllUserSessions(reused.userId);
+    throw new AppError(
+      'Session revoked due to refresh token reuse. Sign in again.',
+      401,
+    );
+  }
 
-  return {
-    sessionId: session.id,
-    userId: session.userId,
-    newRefreshToken,
-  };
+  throw new AppError('Invalid or expired session', 401);
 }
 
 export async function revokeUserSession(sessionId: string, userId: string) {
@@ -72,7 +100,12 @@ export async function revokeUserSession(sessionId: string, userId: string) {
 export async function revokeUserSessionByRefreshToken(refreshToken: string) {
   const refreshTokenHash = hashRefreshToken(refreshToken);
   await prisma.userSession.deleteMany({
-    where: { refreshTokenHash },
+    where: {
+      OR: [
+        { refreshTokenHash },
+        { previousRefreshTokenHash: refreshTokenHash },
+      ],
+    },
   });
 }
 

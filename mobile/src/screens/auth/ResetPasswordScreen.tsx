@@ -5,7 +5,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  View,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -15,13 +14,12 @@ import {
   PasswordField,
   PrimaryButton,
   Screen,
-  SectionTitle,
+  SoftCardHeader,
   TextField,
 } from '../../components/ui';
 import { forgotPassword, resetPassword } from '../../api/auth';
 import { ApiError } from '../../api/client';
 import { useResendCooldown } from '../../hooks/useResendCooldown';
-import { AppLogo } from '../../components/brand/AppLogo';
 import { showToast } from '../../store/toastStore';
 import type { AuthStackParamList } from '../../navigation/types';
 
@@ -106,13 +104,11 @@ export function ResetPasswordScreen({ navigation, route }: Props) {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1">
         <ScrollView keyboardShouldPersistTaps="handled">
-          <View className="mt-2">
-            <AppLogo variant="compact" />
-          </View>
-          <SectionTitle
-            className="mt-6"
-            title="Set a new password"
+          <SoftCardHeader
+            title="New password"
             subtitle={`Code sent to ${email}`}
+            onBack={() => navigation.goBack()}
+            backLabel="Back"
           />
 
           {devCode ? (

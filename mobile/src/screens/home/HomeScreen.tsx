@@ -16,7 +16,6 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   EmptyState,
   ErrorBanner,
-  PrimaryButton,
   Screen,
 } from '../../components/ui';
 import {
@@ -36,6 +35,7 @@ import { useResponsive } from '../../hooks/useResponsive';
 import { getDisplayName, getInitial } from '../../lib/displayName';
 import { resolveTodayFromPlan } from '../../lib/planSchedule';
 import { TAB_SCROLL_CONTENT_EXTRA } from '../../lib/tabBarLayout';
+import { createFocusFetchGate } from '../../lib/tabFocus';
 import { useAuthStore } from '../../store/authStore';
 import { usePlanStore } from '../../store/planStore';
 import { useProfileStore } from '../../store/profileStore';
@@ -87,7 +87,8 @@ export function HomeScreen() {
   const { isCompact, isTablet } = useResponsive();
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const lastFetchMs = useRef(0);
+  const allowFocusFetch = useRef(createFocusFetchGate()).current;
+  const didEnter = useRef(false);
   const rise = useSharedValue(10);
   const opacity = useSharedValue(0);
 
@@ -101,26 +102,40 @@ export function HomeScreen() {
       if (activeTab !== 'Home') {
         return;
       }
-      opacity.value = withTiming(1, { duration: 400 });
-      rise.value = withTiming(0, { duration: 400 });
-      const now = Date.now();
-      if (now - lastFetchMs.current < 30_000) {
+      if (!didEnter.current) {
+        didEnter.current = true;
+        opacity.value = withTiming(1, { duration: 280 });
+        rise.value = withTiming(0, { duration: 280 });
+      } else {
+        opacity.value = 1;
+        rise.value = 0;
+      }
+      if (!allowFocusFetch.tryAcquire()) {
         return;
       }
-      lastFetchMs.current = now;
       void Promise.all([fetchLatest(), fetchStats()]).catch((err) => {
         setError(err instanceof Error ? err.message : 'Could not refresh');
       });
-    }, [activeTab, fetchLatest, fetchStats, opacity, rise]),
+    }, [activeTab, allowFocusFetch, fetchLatest, fetchStats, opacity, rise]),
   );
 
-  const onRefresh = async () => {
-    setRefreshing(true);
+  const refetchHome = useCallback(async () => {
     setError(null);
+    allowFocusFetch.mark();
     try {
       await Promise.all([fetchLatest(), fetchStats()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not refresh');
+      throw err;
+    }
+  }, [fetchLatest, fetchStats]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetchHome();
+    } catch {
+      // Error banner set in refetchHome
     } finally {
       setRefreshing(false);
     }
@@ -166,12 +181,16 @@ export function HomeScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={{
-          paddingBottom: TAB_SCROLL_CONTENT_EXTRA + 32,
+          // Screen already pads for the floating tab bar — keep a small scroll tail only.
+          paddingBottom: TAB_SCROLL_CONTENT_EXTRA,
           flexGrow: 0,
         }}>
         <Animated.View style={headerStyle}>
           <HomeTopBar
+            displayName={displayName}
             profileInitial={initial}
+            avatarUrl={profile?.avatarUrl}
+            avatarCacheKey={profile?.updatedAt}
             onProfilePress={() => navigateTo('Profile')}
           />
           <HomeGreeting
@@ -183,7 +202,14 @@ export function HomeScreen() {
 
         {error ? (
           <View style={{ marginTop: HOME_BLOCK_GAP }}>
-            <ErrorBanner message={error} onRetry={() => setError(null)} />
+            <ErrorBanner
+              message={error}
+              onRetry={() => {
+                void refetchHome().catch(() => {
+                  // Keep banner; message already set
+                });
+              }}
+            />
           </View>
         ) : null}
 
@@ -227,19 +253,17 @@ export function HomeScreen() {
               gridCell
               icon="streak"
               filled={streak > 0}
-              primaryAction={streak === 0}
               title="Streak"
               value={streak === 0 ? '0 days' : `${streak} day${streak === 1 ? '' : 's'}`}
-              hint="Consecutive active days"
+              hint="Active days in a row"
               onPress={() => navigateTo('Progress')}
             />
             <StatCarouselCard
               gridCell
               icon="workout"
               filled={workoutDone}
-              primaryAction={!workoutDone}
               title="Workout"
-              value={workoutDone ? 'Complete' : 'Not yet'}
+              value={workoutDone ? 'Complete' : 'Pending'}
               hint="Today's session"
               onPress={() => navigateTo('Log')}
             />
@@ -248,8 +272,8 @@ export function HomeScreen() {
               icon="meals"
               filled={mealsDone}
               title="Meals"
-              value={mealsDone ? 'On plan' : 'Not yet'}
-              hint="Meals followed today"
+              value={mealsDone ? 'On plan' : 'Pending'}
+              hint="Followed today"
               onPress={() => navigateTo('Log')}
             />
             <StatCarouselCard
@@ -264,26 +288,28 @@ export function HomeScreen() {
           </TodayCheckInGrid>
         </View>
 
-        <View style={{ marginTop: HOME_BLOCK_GAP_LG, marginBottom: 8 }}>
+        <View style={{ marginTop: HOME_BLOCK_GAP, marginBottom: 8 }}>
           <HomeSectionTitle
-            title="This week"
-            subtitle="Workouts and meal habit at a glance."
+            title="Habits at a glance"
+            subtitle="Real check-in rates from your Log — tap for Progress."
           />
         </View>
         <View
           className={`flex-row gap-3 ${isTablet ? 'max-w-md' : ''}`}
           style={{ marginBottom: HOME_BLOCK_GAP_LG }}>
           <MetricTile
-            title="Workouts"
+            title="Active days"
             value={`${stats?.activeDays7 ?? 0}/7`}
-            hint="Active days"
+            hint="Check-ins this week"
             progress={(stats?.activeDays7 ?? 0) / 7}
+            onPress={() => navigateTo('Progress')}
           />
           <MetricTile
-            title="Meals"
+            title="30-day"
             value={`${stats ? Math.round(stats.rate30 * 100) : 0}%`}
-            hint="30-day habit"
+            hint="Adherence over a month"
             progress={stats?.rate30 ?? 0}
+            onPress={() => navigateTo('Progress')}
           />
         </View>
 
@@ -332,6 +358,7 @@ export function HomeScreen() {
             <TodayMealsCard
               mealDay={todaySlice.mealDay}
               dayLabel={todaySlice.mealDay.day}
+              onPressViewPlan={() => navigateTo('Plan')}
             />
           </View>
         ) : latest ? (
@@ -363,13 +390,6 @@ export function HomeScreen() {
             <WeekStripWidget days={stats.dayStrip7} title="Week pulse" />
           </View>
         ) : null}
-
-        <PrimaryButton
-          className="mb-2 rounded-full"
-          style={{ marginTop: HOME_BLOCK_GAP_LG + 8 }}
-          label={latest ? 'Open plan forge' : 'Generate plan'}
-          onPress={openGeneratePlan}
-        />
       </ScrollView>
     </Screen>
   );

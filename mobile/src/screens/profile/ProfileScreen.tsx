@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -9,6 +9,7 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   Chip,
+  HeaderTitle,
   PrimaryButton,
   ProfileStatCard,
   SecondaryButton,
@@ -32,9 +33,11 @@ import { useAuthStore } from '../../store/authStore';
 import { usePlanStore } from '../../store/planStore';
 import { useProfileStore } from '../../store/profileStore';
 import { ApiError } from '../../api/client';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { useSaveFeedback } from '../../hooks/useSaveFeedback';
 import { useUnitSettings } from '../../hooks/useUnitSettings';
 import { useResponsive } from '../../hooks/useResponsive';
+import { requireOnline } from '../../lib/offline';
 import { TAB_SCROLL_CONTENT_EXTRA } from '../../lib/tabBarLayout';
 import {
   formatHeightFromCm,
@@ -74,6 +77,7 @@ export function ProfileScreen() {
   const saveProfile = useProfileStore((s) => s.saveProfile);
   const clearProfile = useProfileStore((s) => s.clear);
   const clearPlan = usePlanStore((s) => s.clear);
+  const { isOffline } = useNetworkStatus();
 
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
   const [goal, setGoal] = useState(profile?.goal ?? 'maintain');
@@ -120,6 +124,7 @@ export function ProfileScreen() {
 
   const { isCompact } = useResponsive();
 
+  const didEnter = useRef(false);
   const opacity = useSharedValue(0);
   const rise = useSharedValue(8);
   const headerStyle = useAnimatedStyle(() => ({
@@ -129,8 +134,14 @@ export function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      opacity.value = withTiming(1, { duration: 380 });
-      rise.value = withTiming(0, { duration: 380 });
+      if (!didEnter.current) {
+        didEnter.current = true;
+        opacity.value = withTiming(1, { duration: 280 });
+        rise.value = withTiming(0, { duration: 280 });
+      } else {
+        opacity.value = 1;
+        rise.value = 0;
+      }
     }, [opacity, rise]),
   );
 
@@ -162,6 +173,9 @@ export function ProfileScreen() {
   }, [profile, heightUnit, weightUnit]);
 
   const onSave = async () => {
+    if (!requireOnline('Connect to save your profile.')) {
+      return;
+    }
     setError(null);
     try {
       const age = Number(ageText);
@@ -213,25 +227,20 @@ export function ProfileScreen() {
             displayName={headerName}
             avatarUrl={profile?.avatarUrl}
             cacheKey={profile?.updatedAt}
-            size={88}
+            size={96}
             layout="center"
+            showHint
           />
-          <Text className="mt-4 font-display text-3xl text-ink">{headerName}</Text>
+          <View className="mt-4 items-center" style={{ overflow: 'visible' }}>
+            <HeaderTitle compact>{headerName}</HeaderTitle>
+          </View>
           <Text className="mt-1 font-sans text-sm text-slate">
             {user?.email ?? 'Your account'}
           </Text>
         </Animated.View>
 
         <ProfileSection title="Account">
-          <ProfileAvatar
-            displayName={headerName}
-            avatarUrl={profile?.avatarUrl}
-            cacheKey={profile?.updatedAt}
-            size={64}
-            layout="row"
-            showEditBadge
-          />
-          <Text className="mb-2 mt-4 font-sans text-sm text-slate">Display name</Text>
+          <Text className="mb-2 font-sans text-sm text-slate">Display name</Text>
           <TextInput
             value={displayName}
             onChangeText={setDisplayName}
@@ -250,12 +259,16 @@ export function ProfileScreen() {
             }}
           />
           <Pressable
+            accessibilityRole="button"
             onPress={() => navigation.navigate('AdvancedSettings')}
-            className="rounded-2xl bg-mist px-4 py-3">
-            <Text className="font-sans-semibold text-ink">Advanced settings</Text>
-            <Text className="mt-1 font-sans text-sm text-slate">
-              Local staples, units, reminders, delete account
-            </Text>
+            className="flex-row items-center justify-between gap-3 rounded-2xl border border-ink/10 bg-mist px-4 py-3.5">
+            <View className="min-w-0 flex-1">
+              <Text className="font-sans-semibold text-ink">Settings</Text>
+              <Text className="mt-1 font-sans text-sm leading-5 text-slate">
+                Staples, units, reminders, privacy & account
+              </Text>
+            </View>
+            <Text className="font-sans-semibold text-base text-mint">→</Text>
           </Pressable>
         </ProfileSection>
 
@@ -456,7 +469,7 @@ export function ProfileScreen() {
         <PrimaryButton
           label={buttonLabel}
           onPress={onSave}
-          disabled={saving}
+          disabled={saving || isOffline}
         />
         <View className="mt-3">
           <SecondaryButton label="Sign out" onPress={onLogout} />

@@ -89,11 +89,15 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       set({ latest: null, stale: false });
       return;
     }
-    set({ loading: true, error: null });
+    // Keep existing content visible on tab return — only spin on first load.
+    const silent = get().latest != null;
+    set(silent ? { error: null } : { loading: true, error: null });
     try {
-      const cached = await AsyncStorage.getItem(CACHE_KEY);
-      if (cached) {
-        set({ latest: JSON.parse(cached) as Plan });
+      if (!silent) {
+        const cached = await AsyncStorage.getItem(CACHE_KEY);
+        if (cached) {
+          set({ latest: JSON.parse(cached) as Plan });
+        }
       }
       const payload = await plansApi.fetchLatestPlan(token);
       set({
@@ -120,6 +124,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     const body: PlanGenerateOptions = {
       intent: latest ? 'regenerate' : 'initial',
       focus: options.focus ?? 'balanced',
+      acceptAiProcessing: options.acceptAiProcessing,
       ...options,
     };
     set({ generating: true, error: null });

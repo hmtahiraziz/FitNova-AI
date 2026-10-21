@@ -1,10 +1,14 @@
 import { Router } from 'express';
 import { requireAuth, type AuthedRequest } from '../middleware/auth';
-import { planGenerateBodySchema } from '../schemas/plans.generate.schemas';
+import {
+  planGenerateBodySchema,
+  planReportBodySchema,
+} from '../schemas/plans.generate.schemas';
 import {
   generatePlan,
   getLatestPlanPayload,
   listPlans,
+  reportPlan,
 } from '../services/plan.service';
 
 export const plansRouter = Router();
@@ -15,6 +19,17 @@ plansRouter.post('/generate', async (req: AuthedRequest, res, next) => {
   try {
     const body = planGenerateBodySchema.parse(req.body ?? {});
     const result = await generatePlan(req.user!.userId, body);
+    res.status(201).json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+plansRouter.post('/:planId/report', async (req: AuthedRequest, res, next) => {
+  try {
+    const planId = String(req.params.planId ?? '');
+    const body = planReportBodySchema.parse(req.body ?? {});
+    const result = await reportPlan(req.user!.userId, planId, body);
     res.status(201).json(result);
   } catch (err) {
     next(err);

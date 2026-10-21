@@ -29,7 +29,8 @@ npm run dev
 
 API health: `http://localhost:4000/health`  
 Privacy (hosted HTML for Play Console): `http://localhost:4000/legal/privacy`  
-Terms: `http://localhost:4000/legal/terms`
+Terms: `http://localhost:4000/legal/terms`  
+
 
 **Mobile**
 
@@ -63,12 +64,14 @@ See `backend/.env.example` and `mobile/.env.example` for all variables. Do not c
 1. Create a Railway project from this GitHub repo.
 2. Set the service **Root Directory** to `backend`.
 3. Railway will use `backend/Dockerfile` (preferred) or `backend/railway.toml` build/start settings.
-4. Add environment variables from `backend/.env.example` (`DATABASE_URL`, `JWT_SECRET`, `OPENAI_API_KEY`, Google/SMTP vars, `NODE_ENV=production`, `APP_URL=https://<your-domain>`, `SUPPORT_EMAIL=...`). Do **not** set `PORT` — Railway provides it.
-5. **Avatar persistence:** add a Railway volume (e.g. mount `/data/uploads`) and set `UPLOADS_DIR=/data/uploads`. Without this, profile photos are lost on redeploy.
+4. Add environment variables from `backend/.env.example` (`DATABASE_URL`, `JWT_SECRET` ≥32 random chars, `OPENAI_API_KEY`, Google/SMTP vars, `NODE_ENV=production`, `APP_URL=https://<your-domain>`, `SUPPORT_EMAIL=...`). Do **not** set `PORT` — Railway provides it.
+5. **Avatar persistence:** add a Railway volume (e.g. mount `/data/uploads`) and set `UPLOADS_DIR=/data/uploads`. Without this, profile photos are lost on redeploy. Photos are **not** publicly listed; clients load them via authenticated `GET /profile/avatar` only. The container runs as UID **1001** (`fitnova`) — ensure the volume is writable by that user.
 6. Generate a public HTTPS domain, then set mobile `API_BASE_URL` to that URL.
 7. Confirm:
    - `GET https://<domain>/health` → `{ "status": "ok", "database": "up", ... }`
-   - `GET https://<domain>/legal/privacy` (use this URL in Play Console Data safety / Privacy policy)
+   - `GET https://<domain>/legal/privacy` (Play Console → Privacy policy)
+   - `GET https://<domain>/legal/delete-account` (Play Console → App content → Data deletion)
+8. **Stable legal URLs:** Railway’s default `*.up.railway.app` hostname can change if you recreate the service. Prefer a **custom domain** (or static hosting that proxies these paths) so Privacy and Data deletion URLs in Play Console stay valid after redeploys.
 
 Health check: `GET /health` (includes a Postgres ping; returns 503 if the DB is down).
 
@@ -84,7 +87,8 @@ cp keystore.properties.example keystore.properties
 # Edit keystore.properties with store/key passwords and paths
 ```
 
-`keystore.properties`, `*.jks`, and `*.keystore` (except `debug.keystore`) are gitignored.
+`keystore.properties`, `*.jks`, and `*.keystore` (except `debug.keystore`) are gitignored.  
+**Release builds fail** if `keystore.properties` (or the keystore file) is missing — there is no debug-keystore fallback.
 
 ### 2. Production mobile env
 
@@ -99,13 +103,17 @@ Release builds **require HTTPS** for `API_BASE_URL`.
 
 ### 3. Google Sign-In (release)
 
-In Google Cloud Console, add an Android OAuth client for package `com.b4fitness` using the **SHA-1** of your upload keystore:
+In Google Cloud Console, create an **Android** OAuth client for package `com.b4fitness`. You must register **both** certificate fingerprints (Sign-In fails for Play-distributed builds if the App Signing SHA-1 is missing):
+
+1. **Upload keystore SHA-1** (local signing key):
 
 ```bash
 keytool -list -v -keystore mobile/android/app/upload-keystore.jks -alias fitnova-upload
 ```
 
-Use the same Web client ID on mobile and backend (`GOOGLE_WEB_CLIENT_ID`).
+2. **Play App Signing key SHA-1** (after the first AAB upload): Play Console → Your app → Setup → App signing → App signing key certificate → SHA-1. Add that fingerprint to the same Android OAuth client (or a second Android client for the same package).
+
+Use the same **Web** client ID on mobile and backend (`GOOGLE_WEB_CLIENT_ID`).
 
 ### 4. Build a signed AAB
 
@@ -115,17 +123,19 @@ cd mobile/android
 # Output: app/build/outputs/bundle/release/app-release.aab
 ```
 
-Upload the AAB to Play Console. Prefer Play App Signing.
+Upload the AAB to Play Console. Prefer **Play App Signing**, then add the App Signing SHA-1 to Google Cloud as above.
 
 ### 5. Store listing checklist
 
 | Item | Notes |
 |------|--------|
 | App name | FitNova AI (launcher already uses this; package id remains `com.b4fitness`) |
-| Privacy policy URL | `https://<railway-domain>/legal/privacy` |
-| Terms (optional) | `https://<railway-domain>/legal/terms` |
-| Data safety | Account email, health metrics (height/weight/age), photos, local notifications |
-| Account deletion | In-app: Advanced settings → Delete account |
+| Privacy policy URL | `https://<your-domain>/legal/privacy` |
+| Terms (optional) | `https://<your-domain>/legal/terms` |
+| Data deletion URL | `https://<your-domain>/legal/delete-account` — **required** by Play when the app creates accounts |
+| Data safety | Email; health metrics (height/weight/age, workouts, nutrition); photos; device IDs for sessions; declare OpenAI as a service provider processing health/fitness data for plan generation |
+| Account deletion (in-app) | Advanced settings → Delete account |
+| Account deletion (web) | Public page above (mailto request; no app reinstall required) |
 | Support email | Match `SUPPORT_EMAIL` on the backend |
 
 In-app Terms / Privacy screens are linked from Welcome, Register, and Advanced settings.

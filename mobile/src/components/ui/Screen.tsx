@@ -52,6 +52,8 @@ export function Screen({
               maxWidth: isTablet ? layout.maxContentWidth : undefined,
               width: '100%',
               alignSelf: 'center',
+              // Let card borders/shadows draw fully inside the padded frame.
+              overflow: 'visible',
             },
             style,
           ]}>

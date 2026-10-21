@@ -6,7 +6,9 @@ dotenv.config();
 
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters'),
+  JWT_SECRET: z
+    .string()
+    .min(32, 'JWT_SECRET must be at least 32 characters'),
   OPENAI_API_KEY: z.string().optional().default(''),
   OPENAI_MODEL: z.string().default('gpt-4o-mini'),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -28,6 +30,9 @@ const envSchema = z.object({
   /** Absolute path for uploads (mount a Railway volume here in production). */
   UPLOADS_DIR: z.string().optional().default(''),
   SUPPORT_EMAIL: z.string().optional().default('support@example.com'),
+  /** HTTP Basic Auth for `/docs` and `/openapi.json` (non-production). */
+  SWAGGER_USER: z.string().min(1).default('admin'),
+  SWAGGER_PASSWORD: z.string().min(1).default('admin'),
 });
 
 const parsed = envSchema.safeParse(process.env);
