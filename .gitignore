@@ -4,17 +4,12 @@ dist/
 **/dist/
 
 # Secrets — use .env.example only in the repo
-.env
-.env.local
-**/.env
-**/.env.*
 !**/.env.example
 
 *.log
 .DS_Store
 Thumbs.db
 .idea/
-.vscode/
 
 # Signing keys (never commit)
 *.jks
@@ -37,3 +32,4 @@ backend/src/generated/
 # Prisma local SQLite (if used)
 backend/prisma/*.db
 backend/prisma/*.db-journal
+config.bat
