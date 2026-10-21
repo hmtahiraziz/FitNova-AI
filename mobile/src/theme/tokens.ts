@@ -1,3 +1,5 @@
+import { Platform, type TextStyle } from 'react-native';
+
 /**
  * Pulse Forge design tokens — JS mirrors of Tailwind theme for Reanimated/charts.
  */
@@ -21,23 +23,42 @@ export const fonts = {
   sansSemiBold: 'Manrope-SemiBold',
 } as const;
 
-/** Syne needs explicit line heights to avoid glyph overlap on Android. */
-export function displayTitleStyle(compact: boolean) {
+/** Safe title metrics — Manrope (Syne clipped descenders on many Android devices). */
+const titlePad: TextStyle =
+  Platform.OS === 'android'
+    ? {
+        includeFontPadding: true,
+        textAlignVertical: 'center',
+        paddingBottom: 2,
+      }
+    : { paddingBottom: 1 };
+
+/**
+ * Screen / section title style — Manrope SemiBold.
+ * Prefer `<HeaderTitle>` for screen headers.
+ */
+export function displayTitleStyle(compact: boolean): TextStyle {
+  const fontSize = compact ? 26 : 28;
   return {
-    fontFamily: fonts.display,
-    fontSize: compact ? 26 : 30,
-    lineHeight: compact ? 36 : 42,
+    fontFamily: fonts.sansSemiBold,
+    fontSize,
+    lineHeight: Math.ceil(fontSize * 1.35),
+    letterSpacing: -0.3,
     color: colors.ink,
-  } as const;
+    ...titlePad,
+  };
 }
 
-export function displayCardStyle(compact: boolean) {
+export function displayCardStyle(compact: boolean): TextStyle {
+  const fontSize = compact ? 20 : 24;
   return {
-    fontFamily: fonts.display,
-    fontSize: compact ? 22 : 26,
-    lineHeight: compact ? 30 : 34,
+    fontFamily: fonts.sansSemiBold,
+    fontSize,
+    lineHeight: Math.ceil(fontSize * 1.35),
+    letterSpacing: -0.2,
     color: colors.ink,
-  } as const;
+    ...titlePad,
+  };
 }
 
 export const mistGradient = {

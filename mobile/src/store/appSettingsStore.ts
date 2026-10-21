@@ -10,12 +10,13 @@ export type AppSettingsState = {
   heightUnit: HeightUnit;
   dailyReminders: boolean;
   workoutReminders: boolean;
-  analyticsEnabled: boolean;
+  /** Local mirror of consent to send profile data to OpenAI for plan generation. */
+  aiProcessingConsented: boolean;
   setWeightUnit: (unit: WeightUnit) => void;
   setHeightUnit: (unit: HeightUnit) => void;
   setDailyReminders: (value: boolean) => void;
   setWorkoutReminders: (value: boolean) => void;
-  setAnalyticsEnabled: (value: boolean) => void;
+  setAiProcessingConsented: (value: boolean) => void;
 };
 
 export const useAppSettingsStore = create<AppSettingsState>()(
@@ -25,16 +26,25 @@ export const useAppSettingsStore = create<AppSettingsState>()(
       heightUnit: 'cm',
       dailyReminders: true,
       workoutReminders: true,
-      analyticsEnabled: true,
+      aiProcessingConsented: false,
       setWeightUnit: (weightUnit) => set({ weightUnit }),
       setHeightUnit: (heightUnit) => set({ heightUnit }),
       setDailyReminders: (dailyReminders) => set({ dailyReminders }),
       setWorkoutReminders: (workoutReminders) => set({ workoutReminders }),
-      setAnalyticsEnabled: (analyticsEnabled) => set({ analyticsEnabled }),
+      setAiProcessingConsented: (aiProcessingConsented) =>
+        set({ aiProcessingConsented }),
     }),
     {
       name: 'fitnova-settings',
       storage: createJSONStorage(() => AsyncStorage),
+      // Drop legacy analyticsEnabled if present in older persisted payloads.
+      partialize: (state) => ({
+        weightUnit: state.weightUnit,
+        heightUnit: state.heightUnit,
+        dailyReminders: state.dailyReminders,
+        workoutReminders: state.workoutReminders,
+        aiProcessingConsented: state.aiProcessingConsented,
+      }),
     },
   ),
 );

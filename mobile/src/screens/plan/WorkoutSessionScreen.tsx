@@ -4,6 +4,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { SessionExerciseTimeline } from '../../components/plan/SessionExerciseTimeline';
 import { EmptyState, Screen, StackScreenHeader } from '../../components/ui';
 import { GlassSurface } from '../../components/ui/GlassSurface';
+import { formatExerciseDoseLine } from '../../lib/exerciseDose';
 import { usePlanStore } from '../../store/planStore';
 import { colors, fonts } from '../../theme/tokens';
 import type { RootStackParamList } from '../../navigation/types';
@@ -82,7 +83,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
           </View>
 
           <GlassSurface
-            className="min-w-0 overflow-hidden px-5 py-6"
+            className="min-w-0 px-5 py-6"
             style={{ borderRadius: 24 }}>
             <Text
               style={{
@@ -117,7 +118,7 @@ export function WorkoutSessionScreen({ navigation, route }: Props) {
                   lineHeight: 22,
                   color: colors.ink,
                 }}>
-                {current.sets} sets × {current.reps}
+                {formatExerciseDoseLine(current.sets, current.reps)}
               </Text>
             </View>
             {current.notes ? (

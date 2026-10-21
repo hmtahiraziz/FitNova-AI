@@ -1,22 +1,16 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
   ScrollView,
   Text,
   View,
-  ViewStyle,
 } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSequence,
-  withTiming,
-} from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import {
   EmptyState,
   ErrorBanner,
+  GlassSurface,
   Screen,
   TabScreenHeader,
 } from '../../components/ui';
@@ -31,7 +25,9 @@ import {
 } from '../../components/progress/Charts';
 import { useProgressStore } from '../../store/progressStore';
 import { useResponsive } from '../../hooks/useResponsive';
-import { colors } from '../../theme/tokens';
+import { useAppTabs } from '../../navigation/AppTabContext';
+import { createFocusFetchGate } from '../../lib/tabFocus';
+import { colors, fonts } from '../../theme/tokens';
 import { TAB_SCROLL_CONTENT_EXTRA } from '../../lib/tabBarLayout';
 
 export function ProgressScreen() {
@@ -40,35 +36,31 @@ export function ProgressScreen() {
   const loading = useProgressStore((s) => s.loading);
   const error = useProgressStore((s) => s.error);
   const refresh = useProgressStore((s) => s.refresh);
+  const { navigateTo } = useAppTabs();
   const { isTablet } = useResponsive();
   const [refreshing, setRefreshing] = useState(false);
-  const pulse = useSharedValue(1);
-
-  const streakStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: pulse.value }],
-  }));
+  const allowFocusFetch = useRef(createFocusFetchGate()).current;
 
   const weightPoints = useMemo(() => buildWeightPoints(logs), [logs]);
 
   useFocusEffect(
     useCallback(() => {
-      void refresh().then(() => {
-        pulse.value = withSequence(
-          withTiming(1.04, { duration: 200 }),
-          withTiming(1, { duration: 280 }),
-        );
-      });
-    }, [refresh, pulse]),
+      if (allowFocusFetch.tryAcquire()) {
+        void refresh();
+      }
+    }, [allowFocusFetch, refresh]),
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
+    allowFocusFetch.mark();
     await refresh();
     setRefreshing(false);
   };
 
   const streak = stats?.currentStreak ?? 0;
   const hasHistory = logs.length > 0;
+  const initialLoading = loading && !stats && !hasHistory;
   const streakSubtitle =
     streak === 1
       ? `day${stats && stats.longestStreak > 0 ? ` · best ${stats.longestStreak}` : ''}`
@@ -77,6 +69,15 @@ export function ProgressScreen() {
             ? ` · best ${stats.longestStreak}`
             : ''
         }`;
+
+  const summaryTone =
+    !stats || stats.activeDays7 === 0
+      ? { label: 'Start logging', bg: `${colors.sage}33` }
+      : stats.rate7 >= 0.7
+        ? { label: 'On track', bg: `${colors.mint}44` }
+        : stats.rate7 >= 0.35
+          ? { label: 'Building', bg: `${colors.sage}66` }
+          : { label: 'Keep going', bg: `${colors.sage}44` };
 
   return (
     <Screen>
@@ -90,15 +91,77 @@ export function ProgressScreen() {
         <TabScreenHeader
           title="Progress"
           titleDescenderSafe
-          subtitle="Trends from your daily check-ins — streak, adherence, weight."
+          subtitle="Live trends from your Log check-ins."
         />
 
         {error ? (
           <ErrorBanner message={error} onRetry={() => void refresh()} />
         ) : null}
 
-        {loading && !stats ? (
-          <ActivityIndicator className="mt-8" color={colors.mint} />
+        {initialLoading ? (
+          <GlassSurface className="mb-4 items-center px-5 py-10" style={{ borderRadius: 22 }}>
+            <ActivityIndicator color={colors.mint} />
+            <Text
+              style={{
+                marginTop: 12,
+                fontFamily: fonts.sansMedium,
+                fontSize: 14,
+                lineHeight: 20,
+                color: colors.slate,
+              }}>
+              Loading your trends…
+            </Text>
+          </GlassSurface>
+        ) : null}
+
+        {!initialLoading ? (
+          <GlassSurface
+            className="mb-4 px-4 py-3.5"
+            style={{ borderRadius: 20 }}>
+            <View className="flex-row items-center justify-between gap-2">
+              <View className="min-w-0 flex-1">
+                <Text
+                  style={{
+                    fontFamily: fonts.sansMedium,
+                    fontSize: 11,
+                    lineHeight: 14,
+                    letterSpacing: 0.5,
+                    color: colors.slate,
+                  }}>
+                  THIS WEEK
+                </Text>
+                <Text
+                  style={{
+                    marginTop: 4,
+                    fontFamily: fonts.sans,
+                    fontSize: 14,
+                    lineHeight: 20,
+                    color: colors.ink,
+                  }}>
+                  {stats
+                    ? `${stats.activeDays7}/7 active · streak ${streak}`
+                    : 'Pull to refresh your stats'}
+                </Text>
+              </View>
+              <View
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 999,
+                  backgroundColor: summaryTone.bg,
+                }}>
+                <Text
+                  style={{
+                    fontFamily: fonts.sansSemiBold,
+                    fontSize: 11,
+                    lineHeight: 14,
+                    color: colors.ink,
+                  }}>
+                  {summaryTone.label}
+                </Text>
+              </View>
+            </View>
+          </GlassSurface>
         ) : null}
 
         <View className={isTablet ? 'flex-row gap-4' : undefined}>
@@ -106,7 +169,6 @@ export function ProgressScreen() {
             <StreakWidget
               streak={streak}
               subtitle={streakSubtitle}
-              animatedStyle={streakStyle as ViewStyle}
               compact={isTablet}
             />
           </View>
@@ -127,7 +189,7 @@ export function ProgressScreen() {
               rate7={stats.rate7}
               activeDays7={stats.activeDays7}
             />
-            <View className="mb-5 flex-row gap-3">
+            <View className="mb-4 flex-row gap-3">
               <RateMeter
                 label="7 days"
                 rate={stats.rate7}
@@ -147,20 +209,41 @@ export function ProgressScreen() {
         {hasHistory ? <ActivityMix logs={logs} /> : null}
 
         {!hasHistory && !loading ? (
-          <EmptyState
-            title="No logs yet"
-            subtitle="Open Log and check in for today. Charts fill in as you track."
-          />
-        ) : (
-          <View>
-            <Text className="mb-1 font-sans-semibold text-lg text-ink">
-              Recent history
-            </Text>
+          <GlassSurface className="mb-2 px-5 py-2" style={{ borderRadius: 22 }}>
+            <EmptyState
+              title="No check-ins yet"
+              subtitle="Log a workout or meals today. Streak, charts, and history fill in from real logs."
+              actionLabel="Open Log"
+              onAction={() => navigateTo('Log')}
+            />
+          </GlassSurface>
+        ) : hasHistory ? (
+          <View className="mb-2">
+            <View className="mb-3 flex-row items-end justify-between gap-2">
+              <Text
+                style={{
+                  fontFamily: fonts.sansSemiBold,
+                  fontSize: 16,
+                  lineHeight: 22,
+                  color: colors.ink,
+                }}>
+                Recent history
+              </Text>
+              <Text
+                style={{
+                  fontFamily: fonts.sans,
+                  fontSize: 12,
+                  lineHeight: 16,
+                  color: colors.slate,
+                }}>
+                {logs.length} day{logs.length === 1 ? '' : 's'}
+              </Text>
+            </View>
             {logs.map((log) => (
               <HistoryRow key={log.id} log={log} />
             ))}
           </View>
-        )}
+        ) : null}
       </ScrollView>
     </Screen>
   );

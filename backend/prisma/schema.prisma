@@ -12,29 +12,37 @@ model User {
   email        String              @unique
   passwordHash String?
   googleId     String?             @unique
+  /** When the user consented to sending profile data to OpenAI for plans. */
+  aiConsentAt  DateTime?
   createdAt    DateTime            @default(now())
   profile      Profile?
   plans        Plan[]
   logs         ProgressLog[]
   resetTokens  PasswordResetToken[]
   sessions     UserSession[]
+  planReports  PlanReport[]
 }
 
 model UserSession {
-  id               String   @id @default(cuid())
-  userId           String
-  refreshTokenHash String
-  deviceId         String?
-  deviceName       String?
-  platform         String?
-  appVersion       String?
-  ipAddress        String?
-  createdAt        DateTime @default(now())
-  lastUsedAt       DateTime @default(now())
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                       String   @id @default(cuid())
+  userId                   String
+  refreshTokenHash         String
+  /** Prior hash kept briefly to detect refresh-token reuse after rotation. */
+  previousRefreshTokenHash String?
+  /** Absolute/sliding session expiry (updated on successful refresh). */
+  expiresAt                DateTime
+  deviceId                 String?
+  deviceName               String?
+  platform                 String?
+  appVersion               String?
+  ipAddress                String?
+  createdAt                DateTime @default(now())
+  lastUsedAt               DateTime @default(now())
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([refreshTokenHash])
+  @@index([previousRefreshTokenHash])
 }
 
 model PasswordResetToken {
@@ -81,6 +89,24 @@ model Plan {
   promptVersion String   @default("v1")
   createdAt     DateTime @default(now())
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports       PlanReport[]
+
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model PlanReport {
+  id        String   @id @default(cuid())
+  userId    String
+  planId    String
+  reason    String
+  details   String?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  plan      Plan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([planId])
 }
 
 model ProgressLog {

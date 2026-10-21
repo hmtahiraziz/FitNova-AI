@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
-import { Text, View } from 'react-native';
+import { Platform, Text, View } from 'react-native';
+import { colors, fonts } from '../../theme/tokens';
 import { PrimaryButton, SecondaryButton } from './Button';
 
 type EmptyStateProps = {
@@ -12,6 +13,10 @@ type EmptyStateProps = {
   children?: ReactNode;
 };
 
+/**
+ * Empty states use Manrope so titles like “No logs yet” never clip,
+ * and stay secondary to the screen HeaderTitle.
+ */
 export function EmptyState({
   title,
   subtitle,
@@ -22,8 +27,24 @@ export function EmptyState({
   children,
 }: EmptyStateProps) {
   return (
-    <View className="items-start py-6">
-      <Text className="font-display text-3xl tracking-tight text-ink">
+    <View className="items-start py-6" style={{ overflow: 'visible' }}>
+      <Text
+        accessibilityRole="header"
+        numberOfLines={2}
+        style={{
+          fontFamily: fonts.sansSemiBold,
+          fontSize: 20,
+          lineHeight: 28,
+          letterSpacing: -0.2,
+          color: colors.ink,
+          ...(Platform.OS === 'android'
+            ? {
+                includeFontPadding: true,
+                textAlignVertical: 'center' as const,
+                paddingBottom: 2,
+              }
+            : { paddingBottom: 1 }),
+        }}>
         {title}
       </Text>
       <Text className="mt-2 max-w-[320px] font-sans text-base leading-6 text-slate">

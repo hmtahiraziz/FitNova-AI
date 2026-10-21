@@ -2,18 +2,11 @@ import React from 'react';
 import {
   Pressable,
   Text,
+  View,
   type PressableProps,
   type TextProps,
 } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
-import { useResponsive } from '../../hooks/useResponsive';
-import { displayTitleStyle } from '../../theme/tokens';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+import { HeaderTitle } from './HeaderTitle';
 
 type PrimaryButtonProps = PressableProps & {
   label: string;
@@ -26,30 +19,16 @@ export function PrimaryButton({
   className = '',
   labelClassName = '',
   disabled,
-  onPressIn,
-  onPressOut,
   ...props
 }: PrimaryButtonProps) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
   return (
-    <AnimatedPressable
+    <Pressable
       accessibilityRole="button"
       disabled={disabled}
-      onPressIn={event => {
-        scale.value = withSpring(0.97, { damping: 15, stiffness: 400 });
-        onPressIn?.(event);
-      }}
-      onPressOut={event => {
-        scale.value = withSpring(1, { damping: 15, stiffness: 400 });
-        onPressOut?.(event);
-      }}
       className={`rounded-xl bg-ink px-6 py-4 ${disabled ? 'opacity-50' : ''} ${className}`}
-      style={animatedStyle}
+      style={({ pressed }) =>
+        !disabled && pressed ? { opacity: 0.88 } : undefined
+      }
       {...props}>
       <Text
         className={`text-center font-sans-semibold text-base text-mist ${labelClassName}`}
@@ -58,8 +37,8 @@ export function PrimaryButton({
         minimumFontScale={0.85}>
         {label}
       </Text>
-      <Animated.View className="mt-2 h-0.5 w-8 self-center bg-mint opacity-80" />
-    </AnimatedPressable>
+      <View className="mt-2 h-0.5 w-8 self-center bg-mint opacity-80" />
+    </Pressable>
   );
 }
 
@@ -81,6 +60,9 @@ export function SecondaryButton({
       accessibilityRole="button"
       disabled={disabled}
       className={`rounded-xl border border-ink/20 bg-transparent px-6 py-4 ${disabled ? 'opacity-50' : ''} ${className}`}
+      style={({ pressed }) =>
+        !disabled && pressed ? { opacity: 0.72 } : undefined
+      }
       {...props}>
       <Text
         className={`text-center font-sans-semibold text-base text-ink ${labelClassName}`}>
@@ -103,26 +85,17 @@ export function SectionTitle({
   className = '',
   titleProps,
 }: SectionTitleProps) {
-  const { isCompact } = useResponsive();
-  const titleStyle = displayTitleStyle(isCompact);
-
   return (
-    <Animated.View className={`mb-4 min-w-0 ${className}`}>
-      <Text
-        className="min-w-0"
-        {...titleProps}
-        numberOfLines={2}
-        adjustsFontSizeToFit
-        minimumFontScale={0.75}
-        style={[titleStyle, titleProps?.style]}>
-        {title}
-      </Text>
+    <View
+      className={`mb-4 min-w-0 ${className}`}
+      style={{ overflow: 'visible' }}>
+      <HeaderTitle style={titleProps?.style}>{title}</HeaderTitle>
       {subtitle ? (
         <Text className="mt-2 min-w-0 font-sans text-base leading-6 text-slate">
           {subtitle}
         </Text>
       ) : null}
-    </Animated.View>
+    </View>
   );
 }
 

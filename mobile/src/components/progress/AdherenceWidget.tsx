@@ -6,6 +6,7 @@ import { GlassSurface } from '../ui/GlassSurface';
 import { WeekStripWidget } from '../home/StreakWidget';
 import { formatWeightAxisKg } from '../../lib/units';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { colors, fonts } from '../../theme/tokens';
 
 type AdherenceWidgetProps = {
   stats: ProgressStats;
@@ -70,49 +71,115 @@ function formatDayLabel(date: string): string {
 
 export function HistoryRow({ log }: { log: ProgressLog }) {
   const weightUnit = useAppSettingsStore((s) => s.weightUnit);
-  const bits = [
-    log.workoutDone ? 'Workout' : null,
-    log.mealsFollowed ? 'Meals' : null,
-  ].filter(Boolean);
+  const active = log.workoutDone || log.mealsFollowed;
 
   return (
-    <View className="border-b border-sage/40 py-3.5">
-      <View className="flex-row items-baseline justify-between">
-        <Text className="font-sans-medium text-base text-ink">
+    <GlassSurface
+      className="mb-2.5 px-4 py-3.5"
+      style={{
+        borderRadius: 18,
+        borderColor: active ? `${colors.mint}55` : colors.glassBorder,
+      }}>
+      <View className="flex-row items-baseline justify-between gap-2">
+        <Text
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontFamily: fonts.sansSemiBold,
+            fontSize: 15,
+            lineHeight: 20,
+            color: colors.ink,
+          }}>
           {formatDayLabel(log.date)}
         </Text>
         {log.weightKg != null ? (
-          <Text className="font-sans tabular-nums text-sm text-slate">
+          <Text
+            style={{
+              fontFamily: fonts.sansMedium,
+              fontSize: 13,
+              lineHeight: 18,
+              color: colors.slate,
+              fontVariant: ['tabular-nums'],
+            }}>
             {formatWeightAxisKg(log.weightKg, weightUnit)}
           </Text>
         ) : null}
       </View>
-      <View className="mt-2 flex-row gap-2">
+      <View className="mt-2.5 flex-row flex-wrap gap-2">
         <View
-          className={`rounded-lg px-2.5 py-1 ${
-            log.workoutDone ? 'bg-mint/25' : 'border border-sage/60'
-          }`}>
-          <Text className="font-sans text-xs text-ink">
+          style={{
+            borderRadius: 999,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            backgroundColor: log.workoutDone
+              ? `${colors.mint}33`
+              : `${colors.sage}33`,
+            borderWidth: log.workoutDone ? 0 : 1,
+            borderColor: `${colors.sage}88`,
+          }}>
+          <Text
+            style={{
+              fontFamily: fonts.sansMedium,
+              fontSize: 11,
+              lineHeight: 14,
+              color: colors.ink,
+            }}>
             {log.workoutDone ? 'Workout' : 'No workout'}
           </Text>
         </View>
         <View
-          className={`rounded-lg px-2.5 py-1 ${
-            log.mealsFollowed ? 'bg-mint/25' : 'border border-sage/60'
-          }`}>
-          <Text className="font-sans text-xs text-ink">
+          style={{
+            borderRadius: 999,
+            paddingHorizontal: 10,
+            paddingVertical: 4,
+            backgroundColor: log.mealsFollowed
+              ? `${colors.mint}33`
+              : `${colors.sage}33`,
+            borderWidth: log.mealsFollowed ? 0 : 1,
+            borderColor: `${colors.sage}88`,
+          }}>
+          <Text
+            style={{
+              fontFamily: fonts.sansMedium,
+              fontSize: 11,
+              lineHeight: 14,
+              color: colors.ink,
+            }}>
             {log.mealsFollowed ? 'Meals' : 'Meals off'}
           </Text>
         </View>
+        {!active ? (
+          <View
+            style={{
+              borderRadius: 999,
+              paddingHorizontal: 10,
+              paddingVertical: 4,
+              backgroundColor: `${colors.sage}22`,
+            }}>
+            <Text
+              style={{
+                fontFamily: fonts.sansMedium,
+                fontSize: 11,
+                lineHeight: 14,
+                color: colors.slate,
+              }}>
+              Inactive
+            </Text>
+          </View>
+        ) : null}
       </View>
       {log.notes ? (
-        <Text className="mt-2 font-sans text-sm text-slate">{log.notes}</Text>
-      ) : null}
-      {bits.length === 0 ? (
-        <Text className="mt-1 font-sans text-sm text-slate">
-          Logged, inactive day
+        <Text
+          style={{
+            marginTop: 10,
+            fontFamily: fonts.sans,
+            fontSize: 13,
+            lineHeight: 18,
+            color: colors.slate,
+          }}>
+          {log.notes}
         </Text>
       ) : null}
-    </View>
+    </GlassSurface>
   );
 }

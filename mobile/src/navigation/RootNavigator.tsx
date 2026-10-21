@@ -1,5 +1,4 @@
-import React, { useEffect } from 'react';
-import { ActivityIndicator, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { LoginScreen } from '../screens/auth/LoginScreen';
@@ -13,12 +12,12 @@ import { WorkoutSessionScreen } from '../screens/plan/WorkoutSessionScreen';
 import { PlanHistoryScreen } from '../screens/plan/PlanHistoryScreen';
 import { AdvancedSettingsScreen } from '../screens/profile/AdvancedSettingsScreen';
 import { LegalDocumentScreen } from '../screens/legal/LegalDocumentScreen';
-import { SwipeableAppShell } from './SwipeableAppShell';
+import { BootSplash } from '../components/brand/BootSplash';
+import { AppTabNavigator } from './AppTabNavigator';
 import { useAuthStore } from '../store/authStore';
 import { usePlanStore } from '../store/planStore';
 import { useProfileStore } from '../store/profileStore';
 import { useProgressStore } from '../store/progressStore';
-import { colors } from '../theme/tokens';
 import type { AuthStackParamList, RootStackParamList } from './types';
 
 const RootStack = createNativeStackNavigator<RootStackParamList>();
@@ -53,12 +52,15 @@ export function RootNavigator() {
   const clearProfile = useProfileStore((s) => s.clear);
   const clearPlan = usePlanStore((s) => s.clear);
   const clearProgress = useProgressStore((s) => s.clear);
+  const [profileGateTimedOut, setProfileGateTimedOut] = useState(false);
 
   useEffect(() => {
     if (!hydrated) {
       return;
     }
     if (token) {
+      // Ensure we wait for a fresh profile after login (avoids stale loaded gate).
+      useProfileStore.setState({ loaded: false, loading: true, error: null });
       void fetchProfile();
     } else {
       clearProfile();
@@ -74,25 +76,36 @@ export function RootNavigator() {
     clearProgress,
   ]);
 
-  if (!hydrated || (token && !loaded)) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor: colors.mist,
-        }}>
-        <ActivityIndicator color={colors.mint} />
-      </View>
-    );
+  // Never block forever on profile — open the gate only (do not log the user out).
+  useEffect(() => {
+    if (!hydrated || !token || loaded) {
+      setProfileGateTimedOut(false);
+      return;
+    }
+    const t = setTimeout(() => {
+      useProfileStore.setState({ loaded: true, loading: false });
+      setProfileGateTimedOut(true);
+    }, 4000);
+    return () => clearTimeout(t);
+  }, [hydrated, token, loaded]);
+
+  if (!hydrated) {
+    return <BootSplash label="Starting FitNova…" />;
+  }
+
+  if (token && !loaded && !profileGateTimedOut) {
+    return <BootSplash label="Loading your profile…" />;
   }
 
   const profileComplete = Boolean(profile?.complete);
 
   return (
     <RootStack.Navigator
-      screenOptions={{ headerShown: false, animation: 'fade' }}>
+      screenOptions={{
+        headerShown: false,
+        animation: 'fade',
+        contentStyle: { backgroundColor: '#E8F2EE' },
+      }}>
       {!token ? (
         <RootStack.Screen name="Auth" component={AuthNavigator} />
       ) : !profileComplete ? (
@@ -106,7 +119,7 @@ export function RootNavigator() {
         </>
       ) : (
         <>
-          <RootStack.Screen name="App" component={SwipeableAppShell} />
+          <RootStack.Screen name="App" component={AppTabNavigator} />
           <RootStack.Screen
             name="GeneratePlan"
             component={GeneratePlanScreen}

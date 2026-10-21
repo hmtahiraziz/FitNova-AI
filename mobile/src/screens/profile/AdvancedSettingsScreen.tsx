@@ -1,8 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Alert,
   Pressable,
-  ScrollView,
   Switch,
   Text,
   TextInput,
@@ -12,16 +10,19 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StaplesEditor } from '../../components/profile/StaplesEditor';
 import {
+  KeyboardForm,
   PrimaryButton,
   SaveSuccessHint,
   Screen,
   SecondaryButton,
   StackScreenHeader,
+  useKeyboardForm,
 } from '../../components/ui';
 import { GlassSurface } from '../../components/ui/GlassSurface';
 import { brand, colors, fonts } from '../../theme/tokens';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useAuthStore } from '../../store/authStore';
+import { showDialog } from '../../store/dialogStore';
 import { usePlanStore } from '../../store/planStore';
 import { useProfileStore } from '../../store/profileStore';
 import type { RootStackParamList } from '../../navigation/types';
@@ -29,10 +30,126 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { syncRemindersFromAppState } from '../../lib/syncReminders';
 import { requestReminderPermission } from '../../services/reminderNotifications';
 import { ApiError } from '../../api/client';
+import { useNetworkStatus } from '../../hooks/useNetworkStatus';
 import { useSaveFeedback } from '../../hooks/useSaveFeedback';
+import { requireOnline } from '../../lib/offline';
 import { profileToInput } from '../../lib/profileInput';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AdvancedSettings'>;
+
+const CARD_RADIUS = 20;
+
+function SectionLabel({
+  title,
+  subtitle,
+}: {
+  title: string;
+  subtitle?: string;
+}) {
+  return (
+    <View className="mb-2.5 mt-1">
+      <Text
+        style={{
+          fontFamily: fonts.sansSemiBold,
+          fontSize: 12,
+          lineHeight: 16,
+          letterSpacing: 0.6,
+          color: colors.slate,
+        }}>
+        {title.toUpperCase()}
+      </Text>
+      {subtitle ? (
+        <Text
+          style={{
+            marginTop: 4,
+            fontFamily: fonts.sans,
+            fontSize: 13,
+            lineHeight: 18,
+            color: colors.slate,
+          }}>
+          {subtitle}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+function UnitChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={{
+        borderRadius: 999,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        backgroundColor: selected ? colors.ink : `${colors.sage}44`,
+        borderWidth: selected ? 0 : 1,
+        borderColor: colors.glassBorder,
+      }}>
+      <Text
+        style={{
+          fontFamily: fonts.sansSemiBold,
+          fontSize: 13,
+          lineHeight: 18,
+          color: selected ? colors.mist : colors.ink,
+        }}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function LinkRow({
+  label,
+  onPress,
+  isLast = false,
+}: {
+  label: string;
+  onPress: () => void;
+  isLast?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="link"
+      onPress={onPress}
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: 14,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: colors.glassBorder,
+      }}>
+      <Text
+        style={{
+          fontFamily: fonts.sansSemiBold,
+          fontSize: 15,
+          lineHeight: 20,
+          color: colors.ink,
+        }}>
+        {label}
+      </Text>
+      <Text
+        style={{
+          fontFamily: fonts.sansSemiBold,
+          fontSize: 16,
+          color: colors.mint,
+        }}>
+        →
+      </Text>
+    </Pressable>
+  );
+}
 
 function SettingRow({
   label,
@@ -46,12 +163,48 @@ function SettingRow({
   onValueChange: (next: boolean) => void;
 }) {
   return (
-    <GlassSurface className="mb-3 flex-row items-center justify-between gap-3 px-4 py-4">
+    <GlassSurface
+      className="mb-2.5 flex-row items-center justify-between gap-3 px-4 py-3.5"
+      style={{ borderRadius: CARD_RADIUS }}>
       <View className="min-w-0 flex-1 shrink">
-        <Text className="font-sans-semibold text-base leading-5 text-ink">
-          {label}
-        </Text>
-        <Text className="mt-1 font-sans text-sm leading-5 text-slate">
+        <View className="flex-row items-center gap-2">
+          <Text
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontFamily: fonts.sansSemiBold,
+              fontSize: 15,
+              lineHeight: 20,
+              color: colors.ink,
+            }}>
+            {label}
+          </Text>
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: 999,
+              backgroundColor: value ? `${colors.mint}44` : `${colors.sage}44`,
+            }}>
+            <Text
+              style={{
+                fontFamily: fonts.sansSemiBold,
+                fontSize: 10,
+                lineHeight: 13,
+                color: colors.ink,
+              }}>
+              {value ? 'On' : 'Off'}
+            </Text>
+          </View>
+        </View>
+        <Text
+          style={{
+            marginTop: 6,
+            fontFamily: fonts.sans,
+            fontSize: 13,
+            lineHeight: 18,
+            color: colors.slate,
+          }}>
           {description}
         </Text>
       </View>
@@ -65,8 +218,108 @@ function SettingRow({
   );
 }
 
+function DeleteAccountSection({
+  email,
+  requirePassword,
+  deletePassword,
+  setDeletePassword,
+  deleteError,
+  onDeletePress,
+  disabled = false,
+}: {
+  email?: string | null;
+  requirePassword: boolean;
+  deletePassword: string;
+  setDeletePassword: (v: string) => void;
+  deleteError: string | null;
+  onDeletePress: () => void;
+  disabled?: boolean;
+}) {
+  const { scrollFocusedIntoView } = useKeyboardForm();
+
+  return (
+    <GlassSurface
+      className="mt-2 px-4 py-4"
+      style={{
+        borderRadius: CARD_RADIUS,
+        borderColor: `${colors.coral}55`,
+      }}>
+      <View className="mb-1 flex-row items-center justify-between gap-2">
+        <Text
+          style={{
+            fontFamily: fonts.sansSemiBold,
+            fontSize: 15,
+            lineHeight: 20,
+            color: colors.coral,
+          }}>
+          Delete account
+        </Text>
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 999,
+            backgroundColor: `${colors.coral}22`,
+          }}>
+          <Text
+            style={{
+              fontFamily: fonts.sansSemiBold,
+              fontSize: 10,
+              lineHeight: 13,
+              color: colors.coral,
+            }}>
+            Permanent
+          </Text>
+        </View>
+      </View>
+      <Text
+        style={{
+          fontFamily: fonts.sans,
+          fontSize: 13,
+          lineHeight: 18,
+          color: colors.slate,
+        }}>
+        Removes {email ?? 'your account'}, profile, plans, and logs. Confirm in
+        the next dialog.
+      </Text>
+      {requirePassword ? (
+        <TextInput
+          value={deletePassword}
+          onChangeText={setDeletePassword}
+          onFocus={() => scrollFocusedIntoView()}
+          placeholder="Account password"
+          placeholderTextColor={colors.sage}
+          secureTextEntry
+          style={{
+            marginTop: 12,
+            fontFamily: fonts.sans,
+            borderWidth: 1,
+            borderColor: 'rgba(11,31,26,0.15)',
+            borderRadius: 12,
+            paddingHorizontal: 14,
+            paddingVertical: 12,
+            color: colors.ink,
+            backgroundColor: colors.mistLight,
+          }}
+        />
+      ) : null}
+      {deleteError ? (
+        <Text className="mt-2 font-sans text-sm text-coral">{deleteError}</Text>
+      ) : null}
+      <View className="mt-3">
+        <SecondaryButton
+          label="Delete account"
+          onPress={onDeletePress}
+          disabled={disabled}
+        />
+      </View>
+    </GlassSurface>
+  );
+}
+
 export function AdvancedSettingsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
+  const { isOffline } = useNetworkStatus();
   const user = useAuthStore((s) => s.user);
   const deleteAccount = useAuthStore((s) => s.deleteAccount);
   const profile = useProfileStore((s) => s.profile);
@@ -79,21 +332,19 @@ export function AdvancedSettingsScreen({ navigation }: Props) {
   const heightUnit = useAppSettingsStore((s) => s.heightUnit);
   const dailyReminders = useAppSettingsStore((s) => s.dailyReminders);
   const workoutReminders = useAppSettingsStore((s) => s.workoutReminders);
-  const analyticsEnabled = useAppSettingsStore((s) => s.analyticsEnabled);
   const setWeightUnit = useAppSettingsStore((s) => s.setWeightUnit);
   const setHeightUnit = useAppSettingsStore((s) => s.setHeightUnit);
   const setDailyReminders = useAppSettingsStore((s) => s.setDailyReminders);
   const setWorkoutReminders = useAppSettingsStore((s) => s.setWorkoutReminders);
-  const setAnalyticsEnabled = useAppSettingsStore((s) => s.setAnalyticsEnabled);
   const clearPlanCache = usePlanStore((s) => s.clear);
 
   const [localStaples, setLocalStaples] = useState<string[]>(
     profile?.localStaples ?? [],
   );
-  const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [staplesError, setStaplesError] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [cacheCleared, setCacheCleared] = useState(false);
 
   const {
     isSaving: savingStaples,
@@ -110,6 +361,8 @@ export function AdvancedSettingsScreen({ navigation }: Props) {
   const onClearCache = async () => {
     clearPlanCache();
     await AsyncStorage.removeItem('b4-latest-plan');
+    setCacheCleared(true);
+    setTimeout(() => setCacheCleared(false), 2000);
   };
 
   const onDailyRemindersChange = async (next: boolean) => {
@@ -135,6 +388,9 @@ export function AdvancedSettingsScreen({ navigation }: Props) {
   };
 
   const onSaveStaples = async () => {
+    if (!requireOnline('Connect to save your staples.')) {
+      return;
+    }
     setStaplesError(null);
     if (!profile) {
       setStaplesError('Complete your profile first.');
@@ -159,15 +415,19 @@ export function AdvancedSettingsScreen({ navigation }: Props) {
   };
 
   const performDeleteAccount = async () => {
+    if (!requireOnline('Connect to delete your account.')) {
+      return;
+    }
     setDeleteError(null);
-    if (deleteConfirm.trim() !== 'DELETE') {
-      setDeleteError('Type DELETE to confirm.');
+    const needsPassword = user?.hasGoogle === false;
+    if (needsPassword && deletePassword.trim().length < 8) {
+      setDeleteError('Enter your account password to delete.');
       return;
     }
     try {
       await deleteAccount({
         confirmation: 'DELETE',
-        password: deletePassword.trim() || undefined,
+        password: needsPassword ? deletePassword.trim() : undefined,
       });
       clearProfile();
       clearPlan();
@@ -179,49 +439,119 @@ export function AdvancedSettingsScreen({ navigation }: Props) {
   };
 
   const onDeletePress = () => {
-    Alert.alert(
-      'Delete account?',
-      'This permanently removes your profile, plans, and progress. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    setDeleteError(null);
+    const needsPassword = user?.hasGoogle === false;
+    if (needsPassword && deletePassword.trim().length < 8) {
+      setDeleteError('Enter your account password first.');
+      return;
+    }
+    showDialog({
+      title: 'Delete account?',
+      message:
+        'This permanently removes your profile, plans, and progress. This cannot be undone.',
+      actions: [
         {
-          text: 'Delete',
-          style: 'destructive',
+          label: 'Delete',
+          variant: 'destructive',
           onPress: () => void performDeleteAccount(),
         },
+        { label: 'Cancel', variant: 'secondary' },
       ],
-    );
+    });
   };
+
+  const footerPad = Math.max(insets.bottom, 16) + 12;
 
   return (
     <Screen tabBarInset={false} edges={['top', 'left', 'right']}>
       <View className="min-h-0 flex-1">
-        <ScrollView
-          className="flex-1"
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 16 }}>
+        <KeyboardForm bottomExtra={24} focusLift={40}>
           <StackScreenHeader
-            title="Advanced settings"
-            subtitle="Units, local staples, reminders, and account data."
+            title="Settings"
+            subtitle="Preferences, reminders, and account controls."
             onBack={() => navigation.goBack()}
           />
 
-          <Text className="mb-2 font-sans-semibold text-sm uppercase tracking-wide text-slate">
-            Local staples
-          </Text>
-          <GlassSurface className="mb-4 px-4 py-4" style={{ borderRadius: 20 }}>
+          {user?.email ? (
+            <GlassSurface
+              className="mb-4 px-4 py-3.5"
+              style={{ borderRadius: CARD_RADIUS }}>
+              <Text
+                style={{
+                  fontFamily: fonts.sansMedium,
+                  fontSize: 11,
+                  lineHeight: 14,
+                  letterSpacing: 0.5,
+                  color: colors.slate,
+                }}>
+                SIGNED IN AS
+              </Text>
+              <Text
+                numberOfLines={1}
+                style={{
+                  marginTop: 4,
+                  fontFamily: fonts.sansSemiBold,
+                  fontSize: 15,
+                  lineHeight: 20,
+                  color: colors.ink,
+                }}>
+                {user.email}
+              </Text>
+              <View className="mt-2 flex-row flex-wrap gap-2">
+                <View
+                  style={{
+                    paddingHorizontal: 8,
+                    paddingVertical: 3,
+                    borderRadius: 999,
+                    backgroundColor: `${colors.mint}33`,
+                  }}>
+                  <Text
+                    style={{
+                      fontFamily: fonts.sansSemiBold,
+                      fontSize: 10,
+                      lineHeight: 13,
+                      color: colors.ink,
+                    }}>
+                    {user.hasGoogle ? 'Google' : 'Email'}
+                  </Text>
+                </View>
+              </View>
+            </GlassSurface>
+          ) : null}
+
+          <SectionLabel
+            title="Local staples"
+            subtitle="Foods your meal plans should prioritize."
+          />
+          <GlassSurface
+            className="mb-5 px-4 py-4"
+            style={{ borderRadius: CARD_RADIUS }}>
             <StaplesEditor
               staples={localStaples}
               onChange={setLocalStaples}
-              helperText="Meal plans prioritize these foods. After changing staples, regenerate your plan from Home or Plan forge."
+              helperText="After changing staples, regenerate your plan for updated meals."
             />
             {latestPlan ? (
               <Pressable
                 onPress={() => navigation.navigate('GeneratePlan')}
-                className="mt-3">
-                <Text className="font-sans-semibold text-sm text-mint">
-                  Regenerate plan for new meals →
+                style={{
+                  marginTop: 12,
+                  alignSelf: 'flex-start',
+                  borderRadius: 999,
+                  borderWidth: 1,
+                  borderColor: colors.glassBorder,
+                  backgroundColor: colors.mist,
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                }}>
+                <Text
+                  style={{
+                    fontFamily: fonts.sansSemiBold,
+                    fontSize: 13,
+                    lineHeight: 18,
+                    color: colors.ink,
+                  }}>
+                  Regenerate plan →
                 </Text>
               </Pressable>
             ) : null}
@@ -239,182 +569,196 @@ export function AdvancedSettingsScreen({ navigation }: Props) {
             <PrimaryButton
               label={staplesButtonLabel}
               onPress={() => void onSaveStaples()}
-              disabled={savingStaples || localStaples.length === 0}
+              disabled={
+                savingStaples || localStaples.length === 0 || isOffline
+              }
             />
           </GlassSurface>
 
-          <Text className="mb-2 font-sans-semibold text-sm uppercase tracking-wide text-slate">
-            Units
-          </Text>
-          <View className="mb-4 flex-row flex-wrap gap-2">
-            <Pressable
-              onPress={() => setWeightUnit('kg')}
-              className={`rounded-full px-4 py-2 ${weightUnit === 'kg' ? 'bg-ink' : 'bg-sage/30'}`}>
-              <Text
-                className={`font-sans-semibold ${weightUnit === 'kg' ? 'text-mist' : 'text-ink'}`}>
-                Weight: kg
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setWeightUnit('lb')}
-              className={`rounded-full px-4 py-2 ${weightUnit === 'lb' ? 'bg-ink' : 'bg-sage/30'}`}>
-              <Text
-                className={`font-sans-semibold ${weightUnit === 'lb' ? 'text-mist' : 'text-ink'}`}>
-                Weight: lb
-              </Text>
-            </Pressable>
-          </View>
-          <View className="mb-6 flex-row flex-wrap gap-2">
-            <Pressable
-              onPress={() => setHeightUnit('cm')}
-              className={`rounded-full px-4 py-2 ${heightUnit === 'cm' ? 'bg-ink' : 'bg-sage/30'}`}>
-              <Text
-                className={`font-sans-semibold ${heightUnit === 'cm' ? 'text-mist' : 'text-ink'}`}>
-                Height: cm
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setHeightUnit('ft')}
-              className={`rounded-full px-4 py-2 ${heightUnit === 'ft' ? 'bg-ink' : 'bg-sage/30'}`}>
-              <Text
-                className={`font-sans-semibold ${heightUnit === 'ft' ? 'text-mist' : 'text-ink'}`}>
-                Height: ft/in (display)
-              </Text>
-            </Pressable>
-          </View>
+          <SectionLabel
+            title="Units"
+            subtitle="Display only — stored values stay metric on the server."
+          />
+          <GlassSurface
+            className="mb-5 px-4 py-4"
+            style={{ borderRadius: CARD_RADIUS }}>
+            <Text
+              style={{
+                fontFamily: fonts.sansMedium,
+                fontSize: 12,
+                lineHeight: 16,
+                color: colors.slate,
+              }}>
+              Weight
+            </Text>
+            <View className="mt-2 flex-row flex-wrap gap-2">
+              <UnitChip
+                label="kg"
+                selected={weightUnit === 'kg'}
+                onPress={() => setWeightUnit('kg')}
+              />
+              <UnitChip
+                label="lb"
+                selected={weightUnit === 'lb'}
+                onPress={() => setWeightUnit('lb')}
+              />
+            </View>
+            <Text
+              style={{
+                marginTop: 14,
+                fontFamily: fonts.sansMedium,
+                fontSize: 12,
+                lineHeight: 16,
+                color: colors.slate,
+              }}>
+              Height
+            </Text>
+            <View className="mt-2 flex-row flex-wrap gap-2">
+              <UnitChip
+                label="cm"
+                selected={heightUnit === 'cm'}
+                onPress={() => setHeightUnit('cm')}
+              />
+              <UnitChip
+                label="ft / in"
+                selected={heightUnit === 'ft'}
+                onPress={() => setHeightUnit('ft')}
+              />
+            </View>
+          </GlassSurface>
 
-          <Text className="mb-2 font-sans-semibold text-sm uppercase tracking-wide text-slate">
-            Reminders
-          </Text>
+          <SectionLabel
+            title="Reminders"
+            subtitle="Scheduled on this device — not marketing push."
+          />
           <SettingRow
             label="Daily log reminder"
-            description="Evening nudge to log workouts and meals (scheduled on this device)."
+            description="Evening nudge to log workouts and meals."
             value={dailyReminders}
             onValueChange={(v) => void onDailyRemindersChange(v)}
           />
           <SettingRow
             label="Workout day reminder"
-            description="Morning reminder on your planned training days."
+            description="Morning reminder on planned training days."
             value={workoutReminders}
             onValueChange={(v) => void onWorkoutRemindersChange(v)}
           />
 
-          <Text className="mb-2 mt-2 font-sans-semibold text-sm uppercase tracking-wide text-slate">
-            Privacy & data
-          </Text>
-          <SettingRow
-            label="Usage analytics"
-            description="Optional preference stored on this device only. No analytics SDK is active yet."
-            value={analyticsEnabled}
-            onValueChange={setAnalyticsEnabled}
+          <SectionLabel
+            title="Privacy & data"
+            subtitle="Legal documents and local cache on this device."
           />
-          <GlassSurface className="mb-3 px-4 py-4">
-            <Text className="font-sans-semibold text-base text-ink">
+
+          <GlassSurface
+            className="mb-2.5 px-4 py-2"
+            style={{ borderRadius: CARD_RADIUS }}>
+            <Text
+              style={{
+                marginTop: 8,
+                fontFamily: fonts.sansSemiBold,
+                fontSize: 15,
+                lineHeight: 20,
+                color: colors.ink,
+              }}>
               Legal
             </Text>
-            <Text className="mt-1 font-sans text-sm leading-5 text-slate">
-              How {brand.fullName} handles your account, health profile, and photos.
+            <Text
+              style={{
+                marginTop: 4,
+                marginBottom: 4,
+                fontFamily: fonts.sans,
+                fontSize: 13,
+                lineHeight: 18,
+                color: colors.slate,
+              }}>
+              How {brand.fullName} handles your account and health profile.
             </Text>
-            <Pressable
-              accessibilityRole="link"
+            <LinkRow
+              label="Privacy Policy"
               onPress={() =>
                 navigation.navigate('LegalDocument', { doc: 'privacy' })
               }
-              className="mt-3">
-              <Text className="font-sans-semibold text-sm text-mint">
-                Privacy Policy →
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="link"
+            />
+            <LinkRow
+              label="Terms of Service"
               onPress={() =>
                 navigation.navigate('LegalDocument', { doc: 'terms' })
               }
-              className="mt-2">
-              <Text className="font-sans-semibold text-sm text-mint">
-                Terms of Service →
-              </Text>
-            </Pressable>
+              isLast
+            />
           </GlassSurface>
 
-          <GlassSurface className="mt-2 px-4 py-4">
-            <Text className="font-sans-semibold text-base text-ink">
+          <GlassSurface
+            className="mb-2.5 px-4 py-4"
+            style={{ borderRadius: CARD_RADIUS }}>
+            <Text
+              style={{
+                fontFamily: fonts.sansSemiBold,
+                fontSize: 15,
+                lineHeight: 20,
+                color: colors.ink,
+              }}>
               Clear cached plan
             </Text>
-            <Text className="mt-1 font-sans text-sm leading-5 text-slate">
-              Removes offline plan copy; latest plan reloads from the server.
-            </Text>
-            <View className="mt-3">
-              <SecondaryButton label="Clear cache" onPress={() => void onClearCache()} />
-            </View>
-          </GlassSurface>
-
-          <GlassSurface className="mt-4 px-4 py-4">
-            <Text className="font-sans-semibold text-base text-coral">
-              Delete account
-            </Text>
-            <Text className="mt-1 font-sans text-sm leading-5 text-slate">
-              Permanently delete {user?.email ?? 'your account'}, profile,
-              plans, and logs.
-            </Text>
-            {user?.hasGoogle === false ? (
-              <TextInput
-                value={deletePassword}
-                onChangeText={setDeletePassword}
-                placeholder="Account password"
-                placeholderTextColor={colors.sage}
-                secureTextEntry
-                style={{
-                  marginTop: 12,
-                  fontFamily: fonts.sans,
-                  borderWidth: 1,
-                  borderColor: 'rgba(11,31,26,0.15)',
-                  borderRadius: 12,
-                  paddingHorizontal: 14,
-                  paddingVertical: 12,
-                  color: colors.ink,
-                }}
-              />
-            ) : null}
-            <TextInput
-              value={deleteConfirm}
-              onChangeText={setDeleteConfirm}
-              placeholder='Type DELETE to confirm'
-              placeholderTextColor={colors.sage}
-              autoCapitalize="characters"
+            <Text
               style={{
-                marginTop: 12,
+                marginTop: 4,
                 fontFamily: fonts.sans,
-                borderWidth: 1,
-                borderColor: 'rgba(11,31,26,0.15)',
-                borderRadius: 12,
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                color: colors.ink,
-              }}
-            />
-            {deleteError ? (
-              <Text className="mt-2 font-sans text-sm text-coral">
-                {deleteError}
-              </Text>
-            ) : null}
+                fontSize: 13,
+                lineHeight: 18,
+                color: colors.slate,
+              }}>
+              Removes the offline plan copy. Latest plan reloads from the
+              server.
+            </Text>
             <View className="mt-3">
-              <SecondaryButton label="Delete account" onPress={onDeletePress} />
+              <SecondaryButton
+                label={cacheCleared ? 'Cache cleared' : 'Clear cache'}
+                onPress={() => void onClearCache()}
+                disabled={cacheCleared}
+              />
             </View>
           </GlassSurface>
 
-          <Text className="mt-6 text-center font-sans text-xs leading-5 text-slate">
+          <SectionLabel title="Danger zone" />
+          <DeleteAccountSection
+            email={user?.email}
+            requirePassword={user?.hasGoogle === false}
+            deletePassword={deletePassword}
+            setDeletePassword={setDeletePassword}
+            deleteError={deleteError}
+            onDeletePress={onDeletePress}
+            disabled={isOffline}
+          />
+
+          <Text
+            style={{
+              marginTop: 20,
+              marginBottom: 8,
+              textAlign: 'center',
+              fontFamily: fonts.sans,
+              fontSize: 12,
+              lineHeight: 18,
+              color: colors.slate,
+            }}>
             {brand.fullName} · General wellness guidance, not medical advice.
           </Text>
-        </ScrollView>
+        </KeyboardForm>
 
         <View
-          className="border-t border-ink/10 pt-4"
           style={{
+            borderTopWidth: 1,
+            borderTopColor: colors.glassBorder,
             backgroundColor: colors.mistLight,
-            paddingBottom: Math.max(insets.bottom, 16),
+            paddingTop: 14,
+            paddingBottom: footerPad,
+            paddingHorizontal: 4,
           }}>
-          <PrimaryButton label="Done" onPress={() => navigation.goBack()} />
+          <PrimaryButton
+            className="rounded-full"
+            label="Done"
+            onPress={() => navigation.goBack()}
+          />
         </View>
       </View>
     </Screen>

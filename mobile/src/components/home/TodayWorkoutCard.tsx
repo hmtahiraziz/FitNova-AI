@@ -35,7 +35,7 @@ export function TodayWorkoutCard({
 
   return (
     <GlassSurface
-      className="min-w-0 overflow-hidden"
+      className="min-w-0"
       style={{ borderRadius: RADIUS }}>
       {/* Header */}
       <View style={{ paddingHorizontal: SP.xl, paddingTop: SP.xl, paddingBottom: SP.md }}>

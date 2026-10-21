@@ -3,6 +3,7 @@ import { prisma } from '../lib/prisma';
 import { AppError } from '../middleware/errorHandler';
 import type { UpsertProfileInput } from '../schemas/profile.schemas';
 import { isProfileComplete } from '../utils/profileComplete';
+import { AVATAR_API_PATH } from './avatar.service';
 
 export { isProfileComplete };
 
@@ -11,7 +12,8 @@ export function serializeProfile(profile: Profile) {
     id: profile.id,
     userId: profile.userId,
     displayName: profile.displayName,
-    avatarUrl: profile.avatarUrl,
+    // Never expose filesystem paths; clients fetch via authenticated route.
+    avatarUrl: profile.avatarUrl ? AVATAR_API_PATH : null,
     goal: profile.goal,
     dietaryPreferences: profile.dietaryPreferences,
     restrictions: profile.restrictions,

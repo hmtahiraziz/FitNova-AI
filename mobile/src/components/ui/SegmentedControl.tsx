@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useResponsive } from '../../hooks/useResponsive';
-import { colors } from '../../theme/tokens';
+import { colors, fonts } from '../../theme/tokens';
 
 export type SegmentOption<T extends string> = {
   key: T;
@@ -16,6 +16,9 @@ type SegmentedControlProps<T extends string> = {
   className?: string;
 };
 
+const OUTER_RADIUS = 18;
+const INNER_RADIUS = 14;
+
 export function SegmentedControl<T extends string>({
   options,
   value,
@@ -26,11 +29,20 @@ export function SegmentedControl<T extends string>({
 
   return (
     <View
-      className={`w-full overflow-hidden ${className}`}
+      className={`w-full ${className}`}
       style={{
-        borderRadius: 999,
-        backgroundColor: 'rgba(11, 31, 26, 0.06)',
-        padding: 4,
+        borderRadius: OUTER_RADIUS,
+        backgroundColor: colors.mist,
+        borderWidth: 1,
+        borderColor: colors.glassBorder,
+        padding: 5,
+        // Soft professional elevation — keep overflow visible so shadow isn't clipped.
+        overflow: 'visible',
+        shadowColor: colors.ink,
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 3 },
+        elevation: 3,
       }}>
       <View className="min-w-0 flex-row">
         {options.map((option) => {
@@ -42,18 +54,35 @@ export function SegmentedControl<T extends string>({
               accessibilityState={{ selected }}
               accessibilityLabel={option.accessibilityLabel ?? option.label}
               onPress={() => onChange(option.key)}
-              className="min-w-0 flex-1 items-center justify-center px-1 py-2.5"
+              className="min-w-0 flex-1 items-center justify-center"
               style={{
-                borderRadius: 999,
+                minHeight: isCompact ? 40 : 44,
+                paddingHorizontal: 6,
+                paddingVertical: 10,
+                borderRadius: INNER_RADIUS,
                 backgroundColor: selected ? colors.ink : 'transparent',
+                ...(selected
+                  ? {
+                      shadowColor: colors.ink,
+                      shadowOpacity: 0.16,
+                      shadowRadius: 5,
+                      shadowOffset: { width: 0, height: 2 },
+                      elevation: 2,
+                    }
+                  : null),
               }}>
               <Text
                 numberOfLines={1}
                 adjustsFontSizeToFit
                 minimumFontScale={0.78}
-                className={`text-center font-sans-semibold ${
-                  isCompact ? 'text-xs' : 'text-sm'
-                } ${selected ? 'text-mist' : 'text-slate'}`}>
+                style={{
+                  textAlign: 'center',
+                  fontFamily: fonts.sansSemiBold,
+                  fontSize: isCompact ? 12 : 13,
+                  lineHeight: isCompact ? 16 : 18,
+                  letterSpacing: 0.2,
+                  color: selected ? colors.mist : colors.slate,
+                }}>
                 {option.label}
               </Text>
             </Pressable>
