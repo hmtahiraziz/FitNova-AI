@@ -30,7 +30,9 @@ WORKDIR /app
 
 RUN apt-get update -y \
   && apt-get install -y --no-install-recommends openssl ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && groupadd --system --gid 1001 fitnova \
+  && useradd --system --uid 1001 --gid fitnova --home-dir /app --shell /usr/sbin/nologin fitnova
 
 ENV NODE_ENV=production
 
@@ -48,7 +50,15 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/src/generated ./src/generated
 
+RUN mkdir -p /app/uploads \
+  && chown -R fitnova:fitnova /app
+
+USER fitnova
+
 EXPOSE 4000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||4000)+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 # Real DATABASE_URL must be set in the host environment (Railway Variables).
 CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

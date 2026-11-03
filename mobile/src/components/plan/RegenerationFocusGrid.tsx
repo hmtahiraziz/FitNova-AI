@@ -1,11 +1,17 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import type { PlanGenerateFocus } from '../../api/plans';
-import { Chip } from '../ui';
+import { colors, fonts } from '../../theme/tokens';
+import { GlassSurface } from '../ui/GlassSurface';
 
 const GRID_GAP = 10;
+const CARD_RADIUS = 18;
 
-type FocusOption = { value: PlanGenerateFocus; label: string };
+export type FocusOption = {
+  value: PlanGenerateFocus;
+  label: string;
+  description?: string;
+};
 
 type RegenerationFocusGridProps = {
   options: FocusOption[];
@@ -14,7 +20,7 @@ type RegenerationFocusGridProps = {
   disabled?: boolean;
 };
 
-/** 2×2 grid of focus chips (equal columns). */
+/** 2×2 grid of focus cards with short descriptions. */
 export function RegenerationFocusGrid({
   options,
   value,
@@ -33,18 +39,68 @@ export function RegenerationFocusGrid({
             justifyContent: 'space-between',
             gap: GRID_GAP,
           }}>
-          {row.map((opt) => (
-            <View key={opt.value} style={{ width: '48%', minWidth: 0 }}>
-              <Chip
-                label={opt.label}
-                selected={value === opt.value}
+          {row.map((opt) => {
+            const selected = value === opt.value;
+            return (
+              <Pressable
+                key={opt.value}
+                accessibilityRole="button"
+                accessibilityState={{ selected, disabled }}
                 disabled={disabled}
-                pill
                 onPress={() => onChange(opt.value)}
-                className="w-full py-3"
-              />
-            </View>
-          ))}
+                style={{ width: '48%', minWidth: 0, opacity: disabled ? 0.55 : 1 }}>
+                <GlassSurface
+                  className="px-3.5 py-3.5"
+                  style={{
+                    borderRadius: CARD_RADIUS,
+                    borderColor: selected
+                      ? `${colors.mint}AA`
+                      : colors.glassBorder,
+                    backgroundColor: selected
+                      ? `${colors.mint}22`
+                      : colors.glass,
+                  }}>
+                  <View className="flex-row items-center justify-between gap-1">
+                    <Text
+                      style={{
+                        flex: 1,
+                        minWidth: 0,
+                        fontFamily: fonts.sansSemiBold,
+                        fontSize: 14,
+                        lineHeight: 18,
+                        color: colors.ink,
+                      }}
+                      numberOfLines={1}>
+                      {opt.label}
+                    </Text>
+                    {selected ? (
+                      <View
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 999,
+                          backgroundColor: colors.mint,
+                        }}
+                      />
+                    ) : null}
+                  </View>
+                  {opt.description ? (
+                    <Text
+                      style={{
+                        marginTop: 6,
+                        fontFamily: fonts.sans,
+                        fontSize: 12,
+                        lineHeight: 16,
+                        color: colors.slate,
+                      }}
+                      numberOfLines={3}>
+                      {opt.description}
+                    </Text>
+                  ) : null}
+                </GlassSurface>
+              </Pressable>
+            );
+          })}
         </View>
       ))}
     </View>

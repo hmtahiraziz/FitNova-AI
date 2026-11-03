@@ -7,15 +7,21 @@ const clientDeviceSchema = {
   appVersion: z.string().max(32).optional(),
 };
 
+/** bcrypt cost grows with length; cap to mitigate DoS. */
+export const passwordSchema = z
+  .string()
+  .min(8, 'Password must be at least 8 characters')
+  .max(128, 'Password must be at most 128 characters');
+
 export const registerSchema = z.object({
   email: z.string().email().transform((v) => v.trim().toLowerCase()),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: passwordSchema,
   ...clientDeviceSchema,
 });
 
 export const loginSchema = z.object({
   email: z.string().email().transform((v) => v.trim().toLowerCase()),
-  password: z.string().min(1, 'Password is required'),
+  password: z.string().min(1, 'Password is required').max(128),
   ...clientDeviceSchema,
 });
 
@@ -39,13 +45,13 @@ export const forgotPasswordSchema = z.object({
 export const resetPasswordSchema = z.object({
   email: z.string().email().transform((v) => v.trim().toLowerCase()),
   code: z.string().regex(/^\d{6}$/, 'Code must be 6 digits'),
-  newPassword: z.string().min(8, 'Password must be at least 8 characters'),
+  newPassword: passwordSchema,
 });
 
 export const deleteAccountSchema = z
   .object({
     confirmation: z.literal('DELETE'),
-    password: z.string().min(1).optional(),
+    password: z.string().min(1).max(128).optional(),
   })
   .superRefine((data, ctx) => {
     if (data.password !== undefined && data.password.length < 8) {

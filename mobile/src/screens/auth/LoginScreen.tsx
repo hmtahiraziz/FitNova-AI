@@ -6,7 +6,6 @@ import {
   Pressable,
   ScrollView,
   Text,
-  View,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
@@ -17,14 +16,13 @@ import {
   PasswordField,
   PrimaryButton,
   Screen,
-  SectionTitle,
+  SoftCardHeader,
   TextField,
 } from '../../components/ui';
 import { useGoogleSignIn } from '../../hooks/useGoogleSignIn';
 import { useAuthStore } from '../../store/authStore';
 import { ApiError } from '../../api/client';
-import { AppLogo } from '../../components/brand/AppLogo';
-import { brand, colors } from '../../theme/tokens';
+import { colors } from '../../theme/tokens';
 import type { AuthStackParamList } from '../../navigation/types';
 
 const schema = z.object({
@@ -86,13 +84,11 @@ export function LoginScreen({ navigation, route }: Props) {
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}>
-          <View className="mt-2">
-            <AppLogo variant="compact" />
-          </View>
-          <SectionTitle
-            className="mt-6"
-            title="Welcome back"
-            subtitle={`Sign in to ${brand.fullName} to continue your plan.`}
+          <SoftCardHeader
+            title="Sign in"
+            subtitle="Continue with your FitNova account."
+            onBack={() => navigation.navigate('Welcome')}
+            backLabel="Back"
           />
 
           <Controller

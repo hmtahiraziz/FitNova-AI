@@ -87,7 +87,7 @@ export function CoachScoreRing({
 
   return (
     <GlassSurface
-      className="min-w-0 overflow-hidden px-5 py-6"
+      className="min-w-0 px-5 py-6"
       style={{ borderRadius: HOME_CARD_RADIUS }}>
       <Text
         className="font-sans-medium text-slate"
@@ -204,19 +204,35 @@ export function CoachScoreRing({
           </View>
           {dayStrip7.length > 0 ? (
             <View className="mt-5 flex-row justify-between gap-1">
-              {dayStrip7.map((day) => (
-                <View key={day.date} className="items-center gap-1">
-                  <View
-                    style={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: 4,
-                      backgroundColor: day.active ? colors.mint : colors.sage,
-                      opacity: day.active ? 1 : 0.35,
-                    }}
-                  />
-                </View>
-              ))}
+              {dayStrip7.map((day) => {
+                const [y, m, d] = day.date.split('-').map(Number);
+                const label = new Date(y, m - 1, d).toLocaleDateString(
+                  undefined,
+                  { weekday: 'narrow' },
+                );
+                return (
+                  <View key={day.date} className="min-w-0 flex-1 items-center gap-1.5">
+                    <View
+                      style={{
+                        width: 10,
+                        height: 10,
+                        borderRadius: 5,
+                        backgroundColor: day.active ? colors.mint : colors.sage,
+                        opacity: day.active ? 1 : 0.35,
+                      }}
+                    />
+                    <Text
+                      style={{
+                        fontFamily: fonts.sans,
+                        fontSize: 10,
+                        lineHeight: 12,
+                        color: colors.slate,
+                      }}>
+                      {label}
+                    </Text>
+                  </View>
+                );
+              })}
             </View>
           ) : (
             <View className="mt-5 flex-row gap-1.5">
@@ -224,9 +240,9 @@ export function CoachScoreRing({
                 <View
                   key={i}
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
+                    width: 10,
+                    height: 10,
+                    borderRadius: 5,
                     backgroundColor: colors.sage,
                     opacity: 0.25,
                   }}
@@ -235,7 +251,7 @@ export function CoachScoreRing({
             </View>
           )}
           <Text className="mt-2 font-sans-medium text-slate" style={{ fontSize: 12 }}>
-            Last 7 days
+            Last 7 days · live from your logs
           </Text>
         </View>
       </View>
@@ -243,8 +259,8 @@ export function CoachScoreRing({
   );
 }
 
-const CHECK_IN_CARD_MIN_HEIGHT = 112;
-const CHECK_IN_GRID_GAP = 12;
+const CHECK_IN_CARD_MIN_HEIGHT = 108;
+const CHECK_IN_GRID_GAP = 10;
 
 type TodayCheckInGridProps = {
   children: React.ReactNode;
@@ -261,13 +277,11 @@ export function TodayCheckInGrid({ children }: TodayCheckInGridProps) {
           key={rowIndex}
           style={{
             flexDirection: 'row',
-            justifyContent: 'space-between',
+            alignItems: 'stretch',
             gap: CHECK_IN_GRID_GAP,
           }}>
           {row.map((cell, colIndex) => (
-            <View
-              key={colIndex}
-              style={{ width: '48%', maxWidth: '48%', minWidth: 0 }}>
+            <View key={colIndex} style={{ flex: 1, minWidth: 0 }}>
               {cell}
             </View>
           ))}
@@ -277,13 +291,16 @@ export function TodayCheckInGrid({ children }: TodayCheckInGridProps) {
   );
 }
 
+/**
+ * Home check-in tile — equal-height glass cards, clear status chip.
+ */
 export function StatCarouselCard({
   title,
   value,
   hint,
   icon,
   filled = false,
-  primaryAction = false,
+  primaryAction: _primaryAction = false,
   onPress,
   style,
   gridCell = false,
@@ -293,97 +310,170 @@ export function StatCarouselCard({
   hint?: string;
   icon?: CheckInIconKind;
   filled?: boolean;
-  /** Mint accent strip for core today actions when empty. */
+  /** @deprecated Kept for call-site compatibility; no longer changes chrome. */
   primaryAction?: boolean;
   onPress?: () => void;
   style?: object;
   gridCell?: boolean;
 }) {
+  void _primaryAction;
   const iconColor = filled ? colors.ink : colors.slate;
+  const statusLabel = filled ? 'Done' : 'Open';
 
-  const surfaceStyle = gridCell
-    ? {
-        borderRadius: HOME_CARD_RADIUS,
-        minHeight: CHECK_IN_CARD_MIN_HEIGHT,
-        borderWidth: 1,
-        width: '100%' as const,
-        borderStyle: (filled ? 'solid' : 'dashed') as 'solid' | 'dashed',
-        borderColor: filled ? colors.glassBorder : `${colors.sage}99`,
-        backgroundColor: filled ? colors.glass : 'transparent',
-        overflow: 'hidden' as const,
-      }
-    : {
-        borderRadius: HOME_CARD_RADIUS,
-        minHeight: CHECK_IN_CARD_MIN_HEIGHT,
-        borderWidth: 1,
-        flex: 1,
-      };
+  const surfaceStyle = {
+    borderRadius: HOME_CARD_RADIUS,
+    minHeight: CHECK_IN_CARD_MIN_HEIGHT,
+    width: gridCell ? ('100%' as const) : undefined,
+    flex: 1,
+    overflow: 'visible' as const,
+    borderWidth: 1,
+    borderColor: filled ? `${colors.mint}66` : colors.glassBorder,
+    backgroundColor: colors.glass,
+    ...(Platform.OS === 'ios'
+      ? {
+          shadowColor: colors.ink,
+          shadowOpacity: filled ? 0.06 : 0.03,
+          shadowRadius: 8,
+          shadowOffset: { width: 0, height: 2 },
+        }
+      : { elevation: filled ? 2 : 1 }),
+  };
 
   const inner = (
-    <View className="min-w-0 px-4 py-4">
+    <View
+      style={{
+        flex: 1,
+        minWidth: 0,
+        paddingTop: 12,
+        paddingBottom: 12,
+        paddingRight: 14,
+        paddingLeft: filled ? 16 : 14,
+        justifyContent: 'space-between',
+      }}>
       {filled ? (
-        <LinearGradient
-          colors={[colors.mist, colors.mistLight]}
-          start={mistGradient.start}
-          end={mistGradient.end}
+        <View
+          pointerEvents="none"
           style={{
             position: 'absolute',
             left: 0,
-            right: 0,
-            top: 0,
-            bottom: 0,
-            opacity: 0.65,
+            top: 10,
+            bottom: 10,
+            width: 3,
+            borderRadius: 2,
+            backgroundColor: colors.mint,
           }}
         />
       ) : null}
-      <View className="min-w-0 flex-row items-start justify-between gap-2">
-        <View className="min-w-0 flex-1">
-          <Text
-            className="font-sans-medium text-slate"
-            style={{ fontSize: 13, lineHeight: 18, letterSpacing: 0.4 }}>
-            {title.toUpperCase()}
-          </Text>
-          <Text
-            className="mt-2 font-display text-2xl tabular-nums text-ink"
-            numberOfLines={1}
-            adjustsFontSizeToFit
-            minimumFontScale={0.75}>
-            {value}
-          </Text>
-          {hint ? (
-            <Text className="mt-1 font-sans text-xs text-slate" numberOfLines={2}>
-              {hint}
-            </Text>
-          ) : null}
-        </View>
+
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          minWidth: 0,
+        }}>
+        <Text
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontFamily: fonts.sansMedium,
+            fontSize: 11,
+            lineHeight: 14,
+            letterSpacing: 0.6,
+            color: colors.slate,
+          }}
+          numberOfLines={1}>
+          {title.toUpperCase()}
+        </Text>
         {icon ? (
-          <CheckInIcon kind={icon} size={20} color={iconColor} />
+          <View
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: filled ? `${colors.mint}33` : `${colors.sage}44`,
+            }}>
+            <CheckInIcon kind={icon} size={14} color={iconColor} />
+          </View>
         ) : null}
       </View>
-      {!filled && primaryAction ? (
+
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.78}
+        style={{
+          marginTop: 10,
+          fontFamily: fonts.sansSemiBold,
+          fontSize: 20,
+          lineHeight: 26,
+          letterSpacing: -0.3,
+          color: colors.ink,
+          fontVariant: ['tabular-nums'],
+        }}>
+        {value}
+      </Text>
+
+      <View
+        style={{
+          marginTop: 10,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+          minWidth: 0,
+        }}>
+        {hint ? (
+          <Text
+            numberOfLines={1}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              fontFamily: fonts.sans,
+              fontSize: 11,
+              lineHeight: 14,
+              color: colors.slate,
+            }}>
+            {hint}
+          </Text>
+        ) : (
+          <View style={{ flex: 1 }} />
+        )}
         <View
-          className="mt-3 rounded-full py-1.5"
-          style={{ backgroundColor: `${colors.mint}44` }}>
-          <Text className="text-center font-sans-semibold text-[11px] text-ink">
-            Tap to log
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 999,
+            backgroundColor: filled ? `${colors.mint}44` : `${colors.sage}55`,
+          }}>
+          <Text
+            style={{
+              fontFamily: fonts.sansSemiBold,
+              fontSize: 10,
+              lineHeight: 13,
+              color: colors.ink,
+            }}>
+            {statusLabel}
           </Text>
         </View>
-      ) : null}
-      {!filled && !primaryAction ? (
-        <Text className="mt-3 font-sans text-[11px] text-slate">Tap card</Text>
-      ) : null}
+      </View>
     </View>
   );
 
-  if (gridCell && onPress) {
+  if (onPress) {
     return (
       <Pressable
         accessibilityRole="button"
+        accessibilityState={{ selected: filled }}
+        accessibilityLabel={`${title}: ${value}. ${statusLabel}. ${hint ?? ''}`}
         onPress={onPress}
         style={({ pressed }) => [
           surfaceStyle,
           style,
-          pressed ? { opacity: 0.92 } : null,
+          pressed ? { opacity: 0.9, transform: [{ scale: 0.985 }] } : null,
         ]}>
         {inner}
       </Pressable>
@@ -391,11 +481,7 @@ export function StatCarouselCard({
   }
 
   return (
-    <GlassSurface
-      interactive={Boolean(onPress)}
-      onPress={onPress}
-      className="min-w-0"
-      style={[surfaceStyle, style]}>
+    <GlassSurface className="min-w-0" style={[surfaceStyle, style]}>
       {inner}
     </GlassSurface>
   );
@@ -420,9 +506,11 @@ export function WorkoutHeroCard({
     <GlassSurface
       interactive
       onPress={onPress}
-      className="mb-5 w-full min-w-0 self-stretch overflow-hidden"
+      className="mb-5 w-full min-w-0 self-stretch"
       style={{ borderRadius: 28 }}>
-      <View className="min-w-0 bg-ink/90 px-5 pb-5 pt-6">
+      <View
+        className="min-w-0 bg-ink/90 px-5 pb-5 pt-6"
+        style={{ borderRadius: 27 }}>
         <Text className="font-sans-medium text-xs uppercase tracking-wide text-mint">
           Today&apos;s workout
         </Text>
@@ -459,65 +547,183 @@ export function MetricTile({
   value,
   hint,
   progress = 0,
+  onPress,
 }: {
   title: string;
   value: string;
   hint: string;
   /** 0–1 fill for gradient progress bar */
   progress?: number;
+  onPress?: () => void;
 }) {
   const pct = Math.max(0, Math.min(1, progress));
+  const pctLabel = Math.round(pct * 100);
+  const tone =
+    pct >= 0.7 ? 'strong' : pct >= 0.35 ? 'building' : pct > 0 ? 'warm' : 'idle';
+  const toneLabel =
+    tone === 'strong'
+      ? 'Strong'
+      : tone === 'building'
+        ? 'Building'
+        : tone === 'warm'
+          ? 'Started'
+          : 'Open';
+  const toneBg =
+    tone === 'strong'
+      ? `${colors.mint}44`
+      : tone === 'building'
+        ? `${colors.sage}66`
+        : tone === 'warm'
+          ? `${colors.sage}44`
+          : `${colors.sage}33`;
+  const barColors: [string, string] =
+    tone === 'strong'
+      ? [colors.mint, `${colors.mint}CC`]
+      : tone === 'building'
+        ? [`${colors.mint}99`, colors.mint]
+        : [colors.sage, `${colors.mint}88`];
+
+  const body = (
+    <View style={{ minWidth: 0, flex: 1, paddingHorizontal: 14, paddingVertical: 14 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 8,
+        }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontFamily: fonts.sansMedium,
+            fontSize: 11,
+            lineHeight: 14,
+            letterSpacing: 0.6,
+            color: colors.slate,
+          }}>
+          {title.toUpperCase()}
+        </Text>
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: 999,
+            backgroundColor: toneBg,
+          }}>
+          <Text
+            style={{
+              fontFamily: fonts.sansSemiBold,
+              fontSize: 10,
+              lineHeight: 13,
+              color: colors.ink,
+            }}>
+            {toneLabel}
+          </Text>
+        </View>
+      </View>
+
+      <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit
+        minimumFontScale={0.8}
+        style={{
+          marginTop: 10,
+          fontFamily: fonts.sansSemiBold,
+          fontSize: 26,
+          lineHeight: 32,
+          letterSpacing: -0.4,
+          color: colors.ink,
+          fontVariant: ['tabular-nums'],
+        }}>
+        {value}
+      </Text>
+
+      <Text
+        numberOfLines={1}
+        style={{
+          marginTop: 4,
+          fontFamily: fonts.sans,
+          fontSize: 12,
+          lineHeight: 16,
+          color: colors.slate,
+        }}>
+        {hint}
+      </Text>
+
+      <View
+        style={{
+          marginTop: 14,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 8,
+        }}>
+        <View
+          style={{
+            flex: 1,
+            height: 8,
+            borderRadius: 999,
+            backgroundColor: `${colors.sage}55`,
+            overflow: 'hidden',
+          }}>
+          <LinearGradient
+            colors={barColors}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={{
+              width: `${Math.max(pct > 0 ? 6 : 0, pctLabel)}%`,
+              height: '100%',
+              borderRadius: 999,
+            }}
+          />
+        </View>
+        <Text
+          style={{
+            fontFamily: fonts.sansSemiBold,
+            fontSize: 11,
+            lineHeight: 14,
+            color: colors.slate,
+            fontVariant: ['tabular-nums'],
+            minWidth: 32,
+            textAlign: 'right',
+          }}>
+          {pctLabel}%
+        </Text>
+      </View>
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${title}: ${value}. ${hint}. ${toneLabel}`}
+        onPress={onPress}
+        style={({ pressed }) => [
+          {
+            flex: 1,
+            minWidth: 0,
+            borderRadius: HOME_CARD_RADIUS,
+            borderWidth: 1,
+            borderColor:
+              tone === 'strong' ? `${colors.mint}66` : colors.glassBorder,
+            backgroundColor: colors.glass,
+            overflow: 'visible',
+          },
+          pressed ? { opacity: 0.92 } : null,
+        ]}>
+        {body}
+      </Pressable>
+    );
+  }
 
   return (
     <GlassSurface
       elevated
-      className="min-w-0 flex-1 overflow-hidden px-4 py-4"
-      style={{
-        borderRadius: HOME_CARD_RADIUS,
-        shadowColor: colors.ink,
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 4 },
-        elevation: 2,
-      }}>
-      <LinearGradient
-        colors={[colors.mist, colors.mistLight]}
-        start={mistGradient.start}
-        end={mistGradient.end}
-        style={{
-          position: 'absolute',
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 0,
-          opacity: 0.7,
-        }}
-      />
-      <Text
-        className="font-sans-medium text-slate"
-        style={{ fontSize: 13, lineHeight: 18, letterSpacing: 0.4 }}>
-        {title.toUpperCase()}
-      </Text>
-      <Text
-        className="mt-2 font-display text-2xl tabular-nums text-ink"
-        adjustsFontSizeToFit
-        numberOfLines={1}
-        minimumFontScale={0.8}>
-        {value}
-      </Text>
-      <Text className="mt-1 font-sans text-slate" style={{ fontSize: 13, lineHeight: 18 }}>
-        {hint}
-      </Text>
-      <View className="mt-3 h-2 overflow-hidden rounded-full bg-sage/40">
-        <View style={{ width: `${pct * 100}%`, height: '100%' }}>
-          <LinearGradient
-            colors={[colors.mist, colors.mint]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={{ flex: 1 }}
-          />
-        </View>
-      </View>
+      className="min-w-0 flex-1"
+      style={{ borderRadius: HOME_CARD_RADIUS }}>
+      {body}
     </GlassSurface>
   );
 }

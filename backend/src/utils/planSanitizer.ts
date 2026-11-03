@@ -1,5 +1,6 @@
 import type { PlanContent } from '../schemas/plan.schemas';
 import { planContentSchema } from '../schemas/plan.schemas';
+import { MAX_MEAL_KCAL, MIN_MEAL_KCAL } from './planSafety';
 
 function softenCalorieText(text: string): string {
   const lower = text.toLowerCase();
@@ -63,6 +64,19 @@ function preprocessRawPlan(raw: unknown): unknown {
   return plan;
 }
 
+function clampMealCalories(value: number | undefined): number | undefined {
+  if (value == null) {
+    return MIN_MEAL_KCAL;
+  }
+  if (value > MAX_MEAL_KCAL) {
+    return Math.min(MAX_MEAL_KCAL, Math.max(MIN_MEAL_KCAL, 700));
+  }
+  if (value < MIN_MEAL_KCAL) {
+    return MIN_MEAL_KCAL;
+  }
+  return Math.round(value);
+}
+
 export function sanitizePlanContent(raw: unknown): PlanContent {
   const parsed = planContentSchema.parse(preprocessRawPlan(raw));
 
@@ -80,10 +94,7 @@ export function sanitizePlanContent(raw: unknown): PlanContent {
         .map((meal) => ({
           ...meal,
           items: meal.items.filter((item) => item.trim().length > 0),
-          approxCalories:
-            meal.approxCalories && meal.approxCalories > 1200
-              ? 700
-              : meal.approxCalories,
+          approxCalories: clampMealCalories(meal.approxCalories),
         }))
         .filter((meal) => meal.items.length > 0),
     }))

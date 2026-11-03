@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Profile, ProfileInput } from '../api/profile';
 import * as profileApi from '../api/profile';
 import * as profileAvatarApi from '../api/profileAvatar';
+import { clearProfileAvatarUriCache } from '../hooks/useProfileAvatarUri';
 import { useAuthStore } from './authStore';
 
 type ProfileState = {
@@ -70,6 +71,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
     set({ loading: true, error: null });
     try {
       const { profile } = await profileAvatarApi.uploadProfileAvatar(token, asset);
+      clearProfileAvatarUriCache();
       set({ profile, loading: false, loaded: true });
       return profile;
     } catch (err) {
@@ -88,6 +90,7 @@ export const useProfileStore = create<ProfileState>((set) => ({
     set({ loading: true, error: null });
     try {
       const { profile } = await profileAvatarApi.deleteProfileAvatar(token);
+      clearProfileAvatarUriCache();
       set({ profile, loading: false, loaded: true });
       return profile;
     } catch (err) {

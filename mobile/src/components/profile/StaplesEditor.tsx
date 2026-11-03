@@ -16,6 +16,11 @@ type Props = {
   helperText?: string;
 };
 
+/**
+ * Staples picker — sits near the top of Advanced settings.
+ * Do not force KeyboardForm scroll-on-focus here (that jumped to the
+ * bottom of the long screen). KeyboardAvoidingView is enough.
+ */
 export function StaplesEditor({ staples, onChange, helperText }: Props) {
   const [customStaple, setCustomStaple] = useState('');
 
@@ -62,6 +67,8 @@ export function StaplesEditor({ staples, onChange, helperText }: Props) {
           placeholder="Add custom staple"
           placeholderTextColor={colors.sage}
           onSubmitEditing={addCustom}
+          returnKeyType="done"
+          blurOnSubmit
           style={{
             flex: 1,
             fontFamily: fonts.sans,

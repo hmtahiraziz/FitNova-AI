@@ -27,7 +27,7 @@ type ApiRequestConfig = AxiosRequestConfig & {
 const http = axios.create({
   baseURL: API_BASE_URL,
   headers: { Accept: 'application/json' },
-  timeout: 60_000,
+  timeout: 15_000,
 });
 
 let refreshInFlight: Promise<string | null> | null = null;
@@ -59,8 +59,16 @@ function toApiError(err: unknown): ApiError {
       );
     }
     const reason = ax.message || 'Network request failed';
+    // Production: short offline-friendly copy. Dev: include host for debugging.
+    if (__DEV__) {
+      return new ApiError(
+        `Cannot reach API at ${API_BASE_URL} (${reason}). Check Wi‑Fi, firewall, and that the backend is running.`,
+        0,
+        err,
+      );
+    }
     return new ApiError(
-      `Cannot reach API at ${API_BASE_URL} (${reason}). Check Wi‑Fi, firewall, and that the backend is running.`,
+      'You appear to be offline. Check your connection and try again.',
       0,
       err,
     );
@@ -134,6 +142,7 @@ export async function apiRequest<T>(
     skipAuth = false,
     skipRefresh = false,
     headers,
+    timeout,
   }: {
     method?: string;
     body?: unknown;
@@ -141,6 +150,8 @@ export async function apiRequest<T>(
     skipAuth?: boolean;
     skipRefresh?: boolean;
     headers?: Record<string, string>;
+    /** Override default axios timeout (ms). Plan generate needs longer. */
+    timeout?: number;
   } = {},
 ): Promise<T> {
   try {
@@ -150,6 +161,7 @@ export async function apiRequest<T>(
       skipAuth,
       skipRefresh,
       headers: { ...headers },
+      ...(timeout != null ? { timeout } : {}),
     };
 
     if (token) {

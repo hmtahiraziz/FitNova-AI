@@ -53,7 +53,8 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
       set({ stats: null, todayLog: null });
       return;
     }
-    set({ loading: true, error: null });
+    const silent = get().stats != null;
+    set(silent ? { error: null } : { loading: true, error: null });
     try {
       const { stats } = await progressApi.fetchProgressStats(token);
       set({
@@ -75,7 +76,8 @@ export const useProgressStore = create<ProgressState>((set, get) => ({
       set({ logs: [] });
       return;
     }
-    set({ loading: true, error: null });
+    const silent = get().logs.length > 0;
+    set(silent ? { error: null } : { loading: true, error: null });
     try {
       const today = localDateOnly();
       const { logs } = await progressApi.fetchProgress(token, {

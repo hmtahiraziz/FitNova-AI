@@ -26,7 +26,8 @@ export function OfflineBanner({ visible }: Props) {
         paddingHorizontal: 16,
       }}>
       <Text className="text-center font-sans-medium text-sm text-mist">
-        You&apos;re offline. Some features may not work until you reconnect.
+        You&apos;re offline. Cached plans still work — generate, save, and
+        uploads need a connection.
       </Text>
     </View>
   );

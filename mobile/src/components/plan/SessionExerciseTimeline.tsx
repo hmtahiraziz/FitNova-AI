@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, Text, View } from 'react-native';
 import type { PlanExercise } from '../../api/plans';
+import { formatExerciseDoseLine } from '../../lib/exerciseDose';
 import { GlassSurface } from '../ui/GlassSurface';
 import { colors, fonts } from '../../theme/tokens';
 
@@ -92,7 +93,7 @@ function TimelineItem({
             lineHeight: 18,
             color: colors.slate,
           }}>
-          {exercise.sets} sets · {exercise.reps}
+          {formatExerciseDoseLine(exercise.sets, exercise.reps)}
         </Text>
       </View>
     </Pressable>
@@ -107,7 +108,7 @@ export function SessionExerciseTimeline({
 }: SessionExerciseTimelineProps) {
   return (
     <GlassSurface
-      className="min-w-0 overflow-hidden"
+      className="min-w-0"
       style={{ borderRadius: 20, paddingHorizontal: 8, paddingVertical: 8 }}>
       <Text
         style={{

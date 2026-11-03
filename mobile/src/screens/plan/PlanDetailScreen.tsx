@@ -84,20 +84,65 @@ export function PlanDetailScreen({ navigation, route }: Props) {
         </View>
 
         <Text className="mb-3 mt-6 font-sans-semibold text-lg text-ink">Meals</Text>
-        {content.mealPlan.days.map((day, index) => (
+        <View className="gap-3">
+          {content.mealPlan.days.map((day, index) => {
+            const dayKcal = day.meals.reduce(
+              (sum, meal) => sum + (meal.approxCalories ?? 0),
+              0,
+            );
+            return (
+              <GlassSurface
+                key={`${plan.id}-meal-${day.day}`}
+                className="w-full min-w-0 self-stretch px-5 py-4"
+                style={{ borderRadius: 24 }}>
+                <Text className="font-sans-medium text-xs uppercase tracking-wide text-slate">
+                  Day {index + 1}
+                </Text>
+                <Text className="mt-1 min-w-0 font-sans-semibold text-lg leading-6 text-ink">
+                  {day.day}
+                </Text>
+                <Text className="mt-1 font-sans text-sm leading-5 text-slate">
+                  {day.meals.length} meal{day.meals.length === 1 ? '' : 's'}
+                  {dayKcal > 0 ? ` · ~${dayKcal} kcal` : ''}
+                </Text>
+                {day.meals.map((meal) => (
+                  <View
+                    key={`${day.day}-${meal.name}`}
+                    className="mt-4 min-w-0 border-l-2 border-mint/70 pl-3">
+                    <Text className="min-w-0 font-sans-semibold leading-5 text-ink">
+                      {meal.name}
+                      {meal.approxCalories
+                        ? ` · ~${meal.approxCalories} kcal`
+                        : ''}
+                    </Text>
+                    {meal.items.map((item) => (
+                      <Text
+                        key={item}
+                        className="mt-1 min-w-0 font-sans text-sm leading-5 text-slate">
+                        · {item}
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+              </GlassSurface>
+            );
+          })}
+        </View>
+
+        {content.mealPlan.shoppingHints.length > 0 ? (
           <GlassSurface
-            key={`${plan.id}-meal-${day.day}`}
-            className="mb-3 w-full min-w-0 px-5 py-4"
+            className="mt-4 w-full min-w-0 self-stretch px-5 py-4"
             style={{ borderRadius: 24 }}>
-            <Text className="font-sans-medium text-xs uppercase tracking-wide text-slate">
-              Day {index + 1}
-            </Text>
-            <Text className="mt-1 font-sans-semibold text-ink">{day.day}</Text>
-            <Text className="mt-1 font-sans text-sm text-slate">
-              {day.meals.length} meals planned
-            </Text>
+            <Text className="mb-2 font-sans-semibold text-ink">Shopping hints</Text>
+            {content.mealPlan.shoppingHints.map((hint) => (
+              <Text
+                key={hint}
+                className="mb-1 min-w-0 font-sans text-sm leading-5 text-slate">
+                · {hint}
+              </Text>
+            ))}
           </GlassSurface>
-        ))}
+        ) : null}
 
         <Text className="mt-8 font-sans text-xs leading-5 text-slate/80">
           {disclaimer || DISCLAIMER}

@@ -54,7 +54,16 @@ export type PlanGenerateFocus =
 export type PlanGenerateOptions = {
   intent?: 'initial' | 'regenerate';
   focus?: PlanGenerateFocus;
+  /** Required when the server has not yet recorded AI processing consent. */
+  acceptAiProcessing?: boolean;
 };
+
+export type PlanReportReason =
+  | 'unsafe_or_harmful'
+  | 'ignores_restrictions'
+  | 'medical_claims'
+  | 'inaccurate'
+  | 'other';
 
 export type PlanGenerateMeta = {
   generationsUsedLastHour: number;
@@ -77,14 +86,30 @@ export function fetchLatestPlan(token: string) {
   return apiRequest<LatestPlanResponse>('/plans/latest', { token });
 }
 
+/** OpenAI plan gen often exceeds the default 15s client timeout. */
+const GENERATE_TIMEOUT_MS = 90_000;
+
 export function generatePlan(token: string, options: PlanGenerateOptions = {}) {
   return apiRequest<{ plan: Plan; meta: PlanGenerateMeta }>('/plans/generate', {
     method: 'POST',
     token,
     body: options,
+    timeout: GENERATE_TIMEOUT_MS,
   });
 }
 
 export function fetchPlans(token: string) {
   return apiRequest<{ plans: Plan[] }>('/plans', { token });
+}
+
+export function reportPlan(
+  token: string,
+  planId: string,
+  body: { reason: PlanReportReason; details?: string },
+) {
+  return apiRequest<{ message: string }>(`/plans/${planId}/report`, {
+    method: 'POST',
+    token,
+    body,
+  });
 }

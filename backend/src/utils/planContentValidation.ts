@@ -1,7 +1,8 @@
 import type { Profile } from '../generated/prisma/client';
 import type { PlanContent } from '../schemas/plan.schemas';
+import { validateRestrictionsAgainstPlan } from './planSafety';
 
-/** Returns human-readable issue for model retry, or null if OK. */
+/** Schedule / structure checks for model retry. */
 export function validatePlanAgainstProfile(
   content: PlanContent,
   profile: Profile,
@@ -29,6 +30,14 @@ export function validatePlanAgainstProfile(
   }
 
   return null;
+}
+
+/** Restriction check used for OpenAI retry; finalize also scrubs leftovers in code. */
+export function validatePlanRestrictions(
+  content: PlanContent,
+  profile: Profile,
+): string | null {
+  return validateRestrictionsAgainstPlan(content, profile);
 }
 
 export function normalizeShoppingHints(

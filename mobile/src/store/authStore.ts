@@ -4,6 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import type { AuthUser } from '../api/auth';
 import * as authApi from '../api/auth';
 import { getAuthClientInfo } from '../lib/deviceClient';
+import { clearGoogleSession } from '../lib/googleAuth';
 import {
   clearRefreshToken,
   loadRefreshToken,
@@ -50,6 +51,7 @@ export const useAuthStore = create<AuthState>()(
 
       clearSession: async () => {
         await clearRefreshToken();
+        await clearGoogleSession();
         set({ token: null, user: null });
       },
 

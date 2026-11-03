@@ -49,32 +49,55 @@ export function WorkoutDayCard({
 
   return (
     <GlassSurface
-      className="w-full self-stretch overflow-hidden px-0 py-0"
+      className="w-full self-stretch px-0 py-0"
       style={{ borderRadius: CARD_RADIUS }}>
       <Pressable
         accessibilityRole={collapsible ? 'button' : undefined}
         accessibilityState={{ expanded: showExercises }}
         onPress={collapsible ? toggleExpanded : undefined}
         disabled={!collapsible}>
-        <View className="min-w-0 bg-ink px-5 py-4">
+        <View
+          className="min-w-0 bg-ink px-5 py-4"
+          style={{
+            borderTopLeftRadius: CARD_RADIUS - 1,
+            borderTopRightRadius: CARD_RADIUS - 1,
+            ...(!showExercises
+              ? {
+                  borderBottomLeftRadius: CARD_RADIUS - 1,
+                  borderBottomRightRadius: CARD_RADIUS - 1,
+                }
+              : {}),
+          }}>
           <View className="flex-row items-center justify-between gap-2">
             <Text className="font-sans-medium text-xs uppercase tracking-wide text-mint">
               Day {displayDayNumber}
             </Text>
-            {isToday ? (
-              <View className="rounded-full bg-mint px-2.5 py-1">
-                <Text
-                  className="font-sans-semibold text-ink"
-                  style={{ fontSize: 11, lineHeight: 14 }}>
-                  Today
-                </Text>
-              </View>
-            ) : null}
-            {collapsible ? (
-              <Text className="font-sans-semibold text-sm text-sage">
-                {showExercises ? '−' : '+'}
-              </Text>
-            ) : null}
+            <View className="flex-row items-center gap-2">
+              {isToday ? (
+                <View className="rounded-full bg-mint px-2.5 py-1">
+                  <Text
+                    className="font-sans-semibold text-ink"
+                    style={{ fontSize: 11, lineHeight: 14 }}>
+                    Today
+                  </Text>
+                </View>
+              ) : null}
+              {collapsible ? (
+                <View
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 999,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: 'rgba(244,247,245,0.14)',
+                  }}>
+                  <Text className="font-sans-semibold text-sm text-mist">
+                    {showExercises ? '−' : '+'}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
           </View>
           <Text
             style={{
@@ -123,11 +146,18 @@ export function WorkoutDayCard({
       ) : (
         <Pressable
           onPress={toggleExpanded}
-          className="px-5 py-3"
-          accessibilityRole="button">
+          className="flex-row items-center justify-between px-5 py-3.5"
+          accessibilityRole="button"
+          style={{
+            borderBottomLeftRadius: CARD_RADIUS - 1,
+            borderBottomRightRadius: CARD_RADIUS - 1,
+            borderTopWidth: 1,
+            borderTopColor: colors.glassBorder,
+          }}>
           <Text className="font-sans-medium text-sm text-slate">
-            Tap to view {day.exercises.length} exercises
+            View {day.exercises.length} exercises
           </Text>
+          <Text className="font-sans-semibold text-sm text-mint">Expand →</Text>
         </Pressable>
       )}
     </GlassSurface>

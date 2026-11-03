@@ -1,6 +1,10 @@
 import React from 'react';
 import { Text, View } from 'react-native';
 import type { PlanExercise } from '../../api/plans';
+import {
+  formatExerciseBadge,
+  formatExerciseDoseLine,
+} from '../../lib/exerciseDose';
 import { colors, fonts } from '../../theme/tokens';
 
 type WorkoutExerciseRowProps = PlanExercise & {
@@ -19,6 +23,8 @@ export function WorkoutExerciseRow({
   variant = 'list',
 }: WorkoutExerciseRowProps) {
   const isCompact = variant === 'compact';
+  const badge = formatExerciseBadge(sets, reps);
+  const doseLine = formatExerciseDoseLine(sets, reps);
 
   return (
     <View
@@ -55,14 +61,14 @@ export function WorkoutExerciseRow({
             <Text
               className="font-sans-medium tabular-nums text-ink"
               style={{ fontSize: 12, lineHeight: 16 }}>
-              {sets} × {reps}
+              {badge}
             </Text>
           </View>
         </View>
         <Text
           className="mt-1 font-sans-medium text-slate"
           style={{ fontSize: 12, lineHeight: 16 }}>
-          {sets} set{sets === 1 ? '' : 's'} · {reps} reps
+          {doseLine}
         </Text>
         {notes ? (
           <Text

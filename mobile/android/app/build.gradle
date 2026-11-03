@@ -53,8 +53,14 @@ android {
         applicationId "com.b4fitness"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 3
-        versionName "1.0.2"
+        versionCode 5
+        versionName "1.0.4"
+    }
+    externalNativeBuild {
+        cmake {
+            // Keep Ninja object paths below Windows' path limit.
+            buildStagingDirectory file("../../.cxx")
+        }
     }
     signingConfigs {
         debug {
@@ -78,15 +84,9 @@ android {
             manifestPlaceholders = [usesCleartextTraffic: "true"]
         }
         release {
+            // Require upload keystore — no debug-keystore fallback for Play AABs.
             if (hasReleaseKeystore) {
                 signingConfig signingConfigs.release
-            } else {
-                // Local/dev-only fallback. Play uploads MUST use keystore.properties.
-                logger.warn(
-                    "WARNING: android/keystore.properties missing — release is signed with the DEBUG keystore. " +
-                    "Generate an upload keystore before Play Store submission (see README)."
-                )
-                signingConfig signingConfigs.debug
             }
             minifyEnabled enableProguardInReleaseBuilds
             shrinkResources enableProguardInReleaseBuilds
@@ -97,6 +97,41 @@ android {
     applicationVariants.configureEach { variant ->
         variant.outputs.configureEach { output ->
             outputFileName = "FitNova-${variant.versionName}-${variant.buildType.name}.apk"
+        }
+    }
+}
+
+// Fail only when assembling/bundling release (debug builds still work without keystore.properties).
+tasks.configureEach { task ->
+    def n = task.name.toLowerCase()
+    def isReleaseShipTask =
+        n == 'assemblerelease' ||
+        n == 'bundlerelease' ||
+        n == 'installrelease' ||
+        n.endsWith('assemblerelease') ||
+        n.endsWith('bundlerelease')
+    if (isReleaseShipTask) {
+        task.doFirst {
+            if (!hasReleaseKeystore) {
+                throw new GradleException(
+                    "Release builds require android/keystore.properties " +
+                    "(copy from keystore.properties.example). " +
+                    "Debug-signed release AABs are not allowed."
+                )
+            }
+            def storePath = keystoreProperties['storeFile']
+            def store = storePath != null ? rootProject.file(storePath) : null
+            if (store == null || !store.exists()) {
+                throw new GradleException(
+                    "Release keystore file not found: ${storePath}. " +
+                    "Update storeFile in android/keystore.properties."
+                )
+            }
+            if (android.buildTypes.release.signingConfig == null) {
+                throw new GradleException(
+                    "Release signingConfig is not set. Check android/keystore.properties."
+                )
+            }
         }
     }
 }

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -6,29 +6,23 @@ import {
   Pressable,
   ScrollView,
   Text,
-  View,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { EmailAlreadyExistsCard } from '../../components/auth/EmailAlreadyExistsCard';
 import { GoogleSignInBlock } from '../../components/auth/GoogleSignInBlock';
 import {
   PrimaryButton,
   PasswordField,
   Screen,
-  SectionTitle,
+  SoftCardHeader,
   TextField,
 } from '../../components/ui';
 import { useGoogleSignIn } from '../../hooks/useGoogleSignIn';
-import {
-  getRegisterErrorMessage,
-  isEmailAlreadyRegistered,
-} from '../../lib/authErrors';
+import { getRegisterErrorMessage } from '../../lib/authErrors';
 import { useAuthStore } from '../../store/authStore';
-import { AppLogo } from '../../components/brand/AppLogo';
-import { brand, colors } from '../../theme/tokens';
+import { colors } from '../../theme/tokens';
 import type { AuthStackParamList } from '../../navigation/types';
 
 const schema = z
@@ -49,25 +43,15 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Register'>;
 export function RegisterScreen({ navigation }: Props) {
   const register = useAuthStore((s) => s.register);
   const [formError, setFormError] = useState<string | null>(null);
-  const [existingEmail, setExistingEmail] = useState<string | null>(null);
 
   const {
     control,
     handleSubmit,
-    watch,
     formState: { errors, isSubmitting },
   } = useForm<FormValues>({
     resolver: zodResolver(schema),
     defaultValues: { email: '', password: '', confirm: '' },
   });
-
-  const emailValue = watch('email');
-
-  useEffect(() => {
-    if (existingEmail && emailValue.trim().toLowerCase() !== existingEmail) {
-      setExistingEmail(null);
-    }
-  }, [emailValue, existingEmail]);
 
   const { signInWithGoogle, googleLoading } = useGoogleSignIn((message) =>
     setFormError(message),
@@ -75,23 +59,15 @@ export function RegisterScreen({ navigation }: Props) {
 
   const onSubmit = handleSubmit(async (values) => {
     setFormError(null);
-    setExistingEmail(null);
-    const email = values.email.trim().toLowerCase();
     try {
-      await register(email, values.password);
+      await register(values.email.trim().toLowerCase(), values.password);
     } catch (err) {
-      if (isEmailAlreadyRegistered(err)) {
-        setExistingEmail(email);
-        setFormError(null);
-        return;
-      }
       setFormError(getRegisterErrorMessage(err));
     }
   });
 
   const onGoogle = () => {
     setFormError(null);
-    setExistingEmail(null);
     void signInWithGoogle();
   };
 
@@ -103,26 +79,12 @@ export function RegisterScreen({ navigation }: Props) {
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ flexGrow: 1, paddingBottom: 24 }}>
-          <View className="mt-2">
-            <AppLogo variant="compact" />
-          </View>
-          <SectionTitle
-            className="mt-6"
-            title="Create your account"
-            subtitle={`Join ${brand.fullName} for workouts, meals, and streaks.`}
+          <SoftCardHeader
+            title="Create account"
+            subtitle="Workouts, meals, and streaks in one place."
+            onBack={() => navigation.navigate('Welcome')}
+            backLabel="Back"
           />
-
-          {existingEmail ? (
-            <EmailAlreadyExistsCard
-              email={existingEmail}
-              onSignIn={() =>
-                navigation.navigate('Login', { email: existingEmail })
-              }
-              onResetPassword={() =>
-                navigation.navigate('ForgotPassword', { email: existingEmail })
-              }
-            />
-          ) : null}
 
           <Controller
             control={control}

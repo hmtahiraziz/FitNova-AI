@@ -80,27 +80,38 @@ async function main() {
     method: 'PUT',
     token,
     body: {
+      displayName: 'Smoke User',
       goal: 'maintain',
       dietaryPreferences: ['balanced'],
       restrictions: [],
       localStaples: ['eggs', 'rice', 'dal'],
+      activityLevel: 'moderate',
+      experienceLevel: 'beginner',
       daysPerWeek: 3,
       mealsPerDay: 3,
       equipment: ['bodyweight'],
+      heightCm: 170,
+      weightKg: 70,
+      age: 28,
+      sex: 'male',
     },
   });
   assert.equal(profile.status, 200, `profile failed: ${JSON.stringify(profile.data)}`);
   assert.equal((profile.data.profile as Json).complete, true);
 
+  const generateStarted = Date.now();
   const plan = await request('/plans/generate', {
     method: 'POST',
     token,
+    body: { acceptAiProcessing: true, focus: 'balanced' },
   });
+  const generateMs = Date.now() - generateStarted;
   assert.ok(
     plan.status === 201 || plan.status === 200,
     `generate failed: ${JSON.stringify(plan.data)}`,
   );
   assert.ok(plan.data.plan, 'missing plan');
+  console.log(`generate ok in ${(generateMs / 1000).toFixed(2)}s`);
 
   const today = todayLocal();
   const log = await request('/progress', {

@@ -35,6 +35,8 @@ export function GlassSurface({
     borderColor: colors.glassBorder,
     borderWidth: 1,
     borderRadius: 16,
+    // Never clip the 1px border / shadow (Android cuts edges with overflow:hidden).
+    overflow: 'visible',
   };
 
   const wantsPress = interactive || Boolean(onPress);
@@ -63,9 +65,7 @@ export function GlassSurface({
         style={({ pressed }) => [
           surfaceStyle,
           disabled ? { opacity: 0.65 } : null,
-          pressed && isPressable
-            ? { opacity: 0.92, transform: [{ scale: 0.99 }] }
-            : null,
+          pressed && isPressable ? { opacity: 0.92 } : null,
           style,
         ]}>
         {children}

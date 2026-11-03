@@ -1,17 +1,22 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   Chip,
   PrimaryButton,
   Screen,
   SecondaryButton,
-  SectionTitle,
+  SoftCardHeader,
+  SoftProgressFooter,
 } from '../../components/ui';
 import {
   ACTIVITY_LEVELS,
@@ -28,15 +33,6 @@ import { colors, fonts } from '../../theme/tokens';
 import { ApiError } from '../../api/client';
 import { useSaveFeedback } from '../../hooks/useSaveFeedback';
 import { useUnitSettings } from '../../hooks/useUnitSettings';
-
-function ProgressBar({ step, total }: { step: number; total: number }) {
-  const pct = ((step + 1) / total) * 100;
-  return (
-    <View className="mb-6 h-1 w-full overflow-hidden rounded-full bg-sage/40">
-      <View className="h-full bg-mint" style={{ width: `${pct}%` }} />
-    </View>
-  );
-}
 
 function toggleValue(list: string[], value: string) {
   return list.includes(value)
@@ -73,6 +69,12 @@ const inputStyle = {
 } as const;
 
 export function OnboardingScreen() {
+  const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
+  /** Tracks lower fields so we auto-scroll when the keyboard opens. */
+  const needsKeyboardLift = useRef(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+  const keyboardOpen = keyboardHeight > 0;
   const saveProfile = useProfileStore((s) => s.saveProfile);
   const existing = useProfileStore((s) => s.profile);
 
@@ -123,6 +125,35 @@ export function OnboardingScreen() {
     parseHeightToCm: parseHeight,
     parseWeightToKg: parseWeight,
   } = useUnitSettings();
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent =
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const onShow = Keyboard.addListener(showEvent, (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const onHide = Keyboard.addListener(hideEvent, () => {
+      setKeyboardHeight(0);
+      needsKeyboardLift.current = false;
+    });
+    return () => {
+      onShow.remove();
+      onHide.remove();
+    };
+  }, []);
+
+  // Auto-adjust: after keyboard height is known, lift height/weight into view.
+  useEffect(() => {
+    if (!keyboardOpen || !needsKeyboardLift.current) {
+      return;
+    }
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, Platform.OS === 'ios' ? 60 : 100);
+    return () => clearTimeout(t);
+  }, [keyboardOpen, keyboardHeight]);
 
   const total = 6;
   const title = useMemo(
@@ -223,15 +254,40 @@ export function OnboardingScreen() {
     }
   };
 
-  return (
-    <Screen>
-      <ProgressBar step={step} total={total} />
-      <SectionTitle title={title} subtitle={subtitle} />
+  // Extra room under weight so it clears the keyboard after auto-scroll.
+  const keyboardSpacer = keyboardOpen
+    ? Platform.OS === 'ios'
+      ? keyboardHeight + 45
+      : Math.max(300, Math.round(keyboardHeight * 0.55))
+    : 0;
 
-      <ScrollView
-        className="flex-1"
-        keyboardShouldPersistTaps="handled"
-        contentContainerStyle={{ paddingBottom: 24 }}>
+  return (
+    <Screen edges={['top', 'left', 'right']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top : 0}>
+        <SoftCardHeader
+          className={keyboardOpen ? 'mb-3' : undefined}
+          title={title}
+          subtitle={keyboardOpen && step === 4 ? undefined : subtitle}
+          footer={
+            keyboardOpen ? undefined : (
+              <SoftProgressFooter step={step} total={total} />
+            )
+          }
+        />
+
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1 }}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingBottom: 15 + keyboardSpacer,
+          }}>
         {step === 0 ? (
           <View className="flex-row flex-wrap gap-2">
             {GOALS.map((g) => (
@@ -310,6 +366,9 @@ export function OnboardingScreen() {
               <TextInput
                 value={customStaple}
                 onChangeText={setCustomStaple}
+                onFocus={() => {
+                  needsKeyboardLift.current = true;
+                }}
                 placeholder="Add custom staple"
                 placeholderTextColor={colors.sage}
                 style={{ ...inputStyle, flex: 1 }}
@@ -367,6 +426,9 @@ export function OnboardingScreen() {
               <TextInput
                 value={displayName}
                 onChangeText={setDisplayName}
+                onFocus={() => {
+                  needsKeyboardLift.current = false;
+                }}
                 placeholder="First name or nickname"
                 placeholderTextColor={colors.sage}
                 autoCapitalize="words"
@@ -391,29 +453,49 @@ export function OnboardingScreen() {
               <TextInput
                 value={ageText}
                 onChangeText={setAgeText}
+                onFocus={() => {
+                  needsKeyboardLift.current = true;
+                }}
                 keyboardType="number-pad"
                 placeholder="e.g. 28"
                 placeholderTextColor={colors.sage}
                 style={inputStyle}
               />
             </View>
-            <View className="flex-row gap-3">
-              <View className="flex-1">
-                <Text className="mb-2 font-sans-semibold text-ink">{heightLabel}</Text>
+            {/* Stacked so weight is always last and can auto-lift above keyboard */}
+            <View className="gap-5">
+              <View>
+                <Text className="mb-2 font-sans-semibold text-ink">
+                  {heightLabel}
+                </Text>
                 <TextInput
                   value={heightText}
                   onChangeText={setHeightText}
+                  onFocus={() => {
+                    needsKeyboardLift.current = true;
+                    setTimeout(() => {
+                      scrollRef.current?.scrollToEnd({ animated: true });
+                    }, 50);
+                  }}
                   keyboardType="decimal-pad"
                   placeholder={heightPlaceholder}
                   placeholderTextColor={colors.sage}
                   style={inputStyle}
                 />
               </View>
-              <View className="flex-1">
-                <Text className="mb-2 font-sans-semibold text-ink">{weightLabel}</Text>
+              <View>
+                <Text className="mb-2 font-sans-semibold text-ink">
+                  {weightLabel}
+                </Text>
                 <TextInput
                   value={weightText}
                   onChangeText={setWeightText}
+                  onFocus={() => {
+                    needsKeyboardLift.current = true;
+                    setTimeout(() => {
+                      scrollRef.current?.scrollToEnd({ animated: true });
+                    }, 50);
+                  }}
                   keyboardType="decimal-pad"
                   placeholder={weightPlaceholder}
                   placeholderTextColor={colors.sage}
@@ -426,6 +508,8 @@ export function OnboardingScreen() {
                 Use age 13–100 and positive height/weight values.
               </Text>
             ) : null}
+            {/* Keeps weight clear of the keyboard after scrollToEnd */}
+            <View style={{ height: keyboardOpen ? 70 : 6 }} />
           </View>
         ) : null}
 
@@ -478,30 +562,38 @@ export function OnboardingScreen() {
             </View>
           </View>
         ) : null}
-      </ScrollView>
+        </ScrollView>
 
-      {error ? (
-        <Text className="mb-2 font-sans text-sm text-coral">{error}</Text>
-      ) : null}
-
-      <View className="gap-3 pb-1">
-        {step < total - 1 ? (
-          <PrimaryButton
-            label="Continue"
-            disabled={!canContinue()}
-            onPress={() => setStep((s) => s + 1)}
-          />
-        ) : (
-          <PrimaryButton
-            label={buttonLabel}
-            disabled={saving || !canContinue()}
-            onPress={onFinish}
-          />
-        )}
-        {step > 0 ? (
-          <SecondaryButton label="Back" onPress={() => setStep((s) => s - 1)} />
+        {error && !keyboardOpen ? (
+          <Text className="mb-2 font-sans text-sm text-coral">{error}</Text>
         ) : null}
-      </View>
+
+        {!keyboardOpen ? (
+          <View
+            className="gap-3 border-t border-ink/5 pt-3"
+            style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+            {step < total - 1 ? (
+              <PrimaryButton
+                label="Continue"
+                disabled={!canContinue()}
+                onPress={() => setStep((s) => s + 1)}
+              />
+            ) : (
+              <PrimaryButton
+                label={buttonLabel}
+                disabled={saving || !canContinue()}
+                onPress={() => void onFinish()}
+              />
+            )}
+            {step > 0 ? (
+              <SecondaryButton
+                label="Back"
+                onPress={() => setStep((s) => s - 1)}
+              />
+            ) : null}
+          </View>
+        ) : null}
+      </KeyboardAvoidingView>
     </Screen>
   );
 }

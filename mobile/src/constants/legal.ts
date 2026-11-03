@@ -15,45 +15,49 @@ export type LegalDocument = {
   sections: LegalSection[];
 };
 
-const LAST_UPDATED = '2 October 2026';
+const LAST_UPDATED = '20 October 2026';
 
 export const PRIVACY_POLICY: LegalDocument = {
   id: 'privacy',
   title: 'Privacy Policy',
   lastUpdated: LAST_UPDATED,
-  intro: `${brand.fullName} (“we”, “us”) provides AI-assisted workout and meal planning. This policy explains what we collect, how we use it, and the choices you have.`,
+  intro: `${brand.fullName} (“we”, “us”) provides AI-assisted workout and meal planning. This policy explains what we collect, how we use it, who processes it, and the choices you have.`,
   sections: [
     {
       heading: 'Information we collect',
-      body: 'Account data: email address, password hash (we never store plain passwords), and optional Google account identifiers when you use Google Sign-In. Profile data you provide: name, age, sex, height, weight, fitness goals, diet preferences, local food staples, and optional profile photo. Usage data: workout and meal logs, generated plans, streaks, and app settings stored on your device. Technical data: device identifiers used for secure session refresh, and basic server logs needed to operate the API.',
+      body: 'Account data: email address, password hash (we never store plain passwords), and optional Google account identifiers (Google “sub” / subject ID) when you use Google Sign-In. Profile data you provide: display name, age, sex, height, weight, fitness goals, diet preferences, restrictions, local food staples, equipment, schedule preferences, and optional profile photo. Usage data: workout and meal logs, generated plans, streaks, and app settings stored on your device. Technical data: device identifiers used for secure session refresh, and basic server logs needed to operate the API. We do not collect advertising IDs or run third-party ads.',
     },
     {
       heading: 'How we use information',
-      body: 'We use your data to authenticate you, generate and personalize workout and meal plans (including via third-party AI providers), sync progress across sessions, send optional local reminders you enable, and provide customer support. We do not sell your personal information.',
+      body: 'We use your data to authenticate you, generate and personalize workout and meal plans, sync progress across sessions, send optional local reminders you enable, operate and secure the service, and provide customer support. We do not sell your personal information.',
     },
     {
-      heading: 'AI processing',
-      body: 'Plan generation may send profile and preference details to our AI provider solely to create your plan. Do not include sensitive medical diagnoses or unrelated personal data in free-text fields.',
+      heading: 'AI processing (OpenAI)',
+      body: 'When you generate or regenerate a plan, we send selected profile and preference fields (for example goal, age, sex, height, weight, activity level, experience, diet preferences, restrictions, staples, equipment, and schedule) to OpenAI as our AI service provider, solely to create your plan. We do not send your email address, password, Google tokens, or profile photo to OpenAI. Do not include sensitive medical diagnoses or unrelated personal data in free-text fields. Plans are general wellness guidance, not medical advice.',
+    },
+    {
+      heading: 'Service providers and hosting',
+      body: 'We use trusted processors to run the app: Railway (application hosting and optional upload volume for profile photos), Neon (PostgreSQL database), OpenAI (plan generation), Google (Sign-In identity verification), and an SMTP email provider for password-reset messages (message content includes a short-lived reset code). These providers process data only to provide their services to us.',
     },
     {
       heading: 'Storage and security',
-      body: 'Access tokens are kept in memory on your device. Refresh tokens are stored in the device secure keychain. Account and fitness data are stored on our hosted database and servers. Profile photos are stored on our upload volume. We use industry-standard transport encryption (HTTPS) in production.',
+      body: 'Access tokens are kept in memory on your device. Refresh tokens are stored in the device secure keychain. Account and fitness data are stored in our hosted database. Profile photos are stored on our upload volume and are served only to the signed-in account owner (not as a public gallery). We use industry-standard transport encryption (HTTPS) in production. Database backups may retain deleted data for a short period required for reliability and abuse prevention (typically up to 30 days), after which they expire according to our hosting provider’s retention settings.',
     },
     {
       heading: 'Notifications',
-      body: 'If you enable reminders, we schedule local notifications on your device. We do not send marketing push notifications.',
+      body: 'If you enable reminders, we schedule local notifications on your device. Reminder content is generic (for example check-in prompts) and does not include your weight or other health numbers. We do not send marketing push notifications.',
     },
     {
       heading: 'Retention and deletion',
-      body: `You may delete your account in Advanced settings. Deletion removes your account, profile, plans, and logs from our systems, subject to short-lived backups required for reliability. You can also clear cached plan data on device.`,
+      body: 'You may delete your account in Advanced settings → Delete account. You may also request deletion without the app via our public account-deletion web page (linked from the Play Store listing as “Delete account data”, served at /legal/delete-account on our API host) or by emailing the support address published with our Privacy Policy. When deletion is completed, we remove your account, profile, plans, progress logs, sessions, reset tokens, and associated profile photos from active systems, subject to short-lived backups described above. You can also clear cached plan data on device.',
     },
     {
       heading: 'Children',
-      body: `${brand.fullName} is not directed at children under 13 (or the minimum age required in your country). We do not knowingly collect data from children.`,
+      body: `${brand.fullName} is not directed at children under 13 (or the minimum age required in your country). We do not knowingly collect data from children. If you believe a child has created an account, contact us and we will delete it.`,
     },
     {
       heading: 'Your choices',
-      body: 'You can update profile data, disable reminders, clear local cache, opt out of optional usage analytics preferences, or delete your account. Contact us using the support email listed in the app store listing or at the address published with this policy on our API legal pages.',
+      body: 'You can update profile data, disable reminders, clear local cache, or delete your account (in-app or via the public deletion page). We do not currently run a usage-analytics SDK. Contact us using the support email listed in the app store listing or on our hosted Privacy Policy page.',
     },
     {
       heading: 'Changes',
@@ -70,7 +74,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
   sections: [
     {
       heading: 'Service',
-      body: `${brand.fullName} provides general wellness, fitness, and nutrition suggestions. Plans are generated algorithmically and may be imperfect. The app is not a medical device and does not provide medical, dietary, or clinical advice.`,
+      body: `${brand.fullName} provides general wellness, fitness, and nutrition suggestions. Plans are generated algorithmically (including with assistance from OpenAI) and may be imperfect. The app is not a medical device and does not provide medical, dietary, or clinical advice. We do not guarantee weight loss, muscle gain, or any specific health outcome.`,
     },
     {
       heading: 'Eligibility',
@@ -90,7 +94,7 @@ export const TERMS_OF_SERVICE: LegalDocument = {
     },
     {
       heading: 'Termination',
-      body: 'You may delete your account at any time. We may suspend or terminate access for abuse, security risk, or material breach of these Terms.',
+      body: 'You may delete your account at any time in the app (Advanced settings) or by requesting deletion on our public account-deletion web page. We may suspend or terminate access for abuse, security risk, or material breach of these Terms.',
     },
     {
       heading: 'Limitation of liability',

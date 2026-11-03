@@ -6,6 +6,7 @@ import { prisma } from '../lib/prisma';
 import { sendPasswordResetEmail } from '../lib/mail';
 import { AppError } from '../middleware/errorHandler';
 import { signAccessToken } from '../middleware/auth';
+import { deleteAvatarFilesForUser } from './avatar.service';
 import {
   createUserSession,
   revokeUserSessionByRefreshToken,
@@ -111,6 +112,10 @@ export async function loginWithGoogle(
     throw new AppError('Google account is missing email', 400);
   }
 
+  if (payload.email_verified !== true) {
+    throw new AppError('Google email is not verified', 401);
+  }
+
   const email = payload.email.toLowerCase();
   const googleId = payload.sub;
 
@@ -123,11 +128,13 @@ export async function loginWithGoogle(
 
   const existingByEmail = await prisma.user.findUnique({ where: { email } });
   if (existingByEmail) {
-    const linked = await prisma.user.update({
-      where: { id: existingByEmail.id },
-      data: { googleId },
-    });
-    return issueAuthTokens(linked, client);
+    // Never silently take over a password (or other) account via Google email match.
+    // Identity is keyed by Google "sub"; linking requires an explicit future flow.
+    throw new AppError(
+      'An account with this email already exists. Sign in with email and password instead.',
+      409,
+      { code: 'EMAIL_ALREADY_REGISTERED' },
+    );
   }
 
   const created = await prisma.user.create({
@@ -181,14 +188,21 @@ export async function requestPasswordReset(email: string) {
 
   const code = String(crypto.randomInt(100000, 999999));
   const codeHash = await bcrypt.hash(code, SALT_ROUNDS);
+  const now = new Date();
 
-  await prisma.passwordResetToken.create({
-    data: {
-      userId: user.id,
-      codeHash,
-      expiresAt: new Date(Date.now() + RESET_TTL_MS),
-    },
-  });
+  await prisma.$transaction([
+    prisma.passwordResetToken.updateMany({
+      where: { userId: user.id, usedAt: null },
+      data: { usedAt: now },
+    }),
+    prisma.passwordResetToken.create({
+      data: {
+        userId: user.id,
+        codeHash,
+        expiresAt: new Date(Date.now() + RESET_TTL_MS),
+      },
+    }),
+  ]);
 
   try {
     await sendPasswordResetEmail(email, code);
@@ -237,6 +251,7 @@ export async function resetPassword(
   }
 
   const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+  const now = new Date();
 
   await prisma.$transaction([
     prisma.user.update({
@@ -245,8 +260,18 @@ export async function resetPassword(
     }),
     prisma.passwordResetToken.update({
       where: { id: matched.id },
-      data: { usedAt: new Date() },
+      data: { usedAt: now },
     }),
+    // Invalidate any other outstanding reset codes for this user.
+    prisma.passwordResetToken.updateMany({
+      where: {
+        userId: user.id,
+        usedAt: null,
+        id: { not: matched.id },
+      },
+      data: { usedAt: now },
+    }),
+    prisma.userSession.deleteMany({ where: { userId: user.id } }),
   ]);
 
   return { message: 'Password updated. You can sign in now.' };
@@ -282,6 +307,12 @@ export async function deleteUserAccount(
       throw new AppError('Incorrect password', 401);
     }
   }
+
+  const profile = await prisma.profile.findUnique({
+    where: { userId },
+    select: { avatarUrl: true },
+  });
+  await deleteAvatarFilesForUser(userId, profile?.avatarUrl);
 
   await prisma.user.delete({ where: { id: userId } });
 
